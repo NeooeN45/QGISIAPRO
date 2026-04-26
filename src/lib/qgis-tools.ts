@@ -44,6 +44,12 @@ import {
   searchOfficialSources,
   searchOverpassFeatures,
 } from "./official-sources";
+import {
+  fetchHubEauStations,
+  type HubEauEndpoint,
+  fetchGbifOccurrences,
+  fetchDvfTransactions,
+} from "./rest-connectors";
 
 export interface OpenAiToolDefinition {
   type: "function";
@@ -943,6 +949,92 @@ const OPENAI_QGIS_TOOLS: OpenAiToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "loadHubEauStations",
+      description:
+        "Charger des stations Hub'Eau (qualité rivières, hydrométrie, piézométrie) en couche QGIS, filtrées par commune, département ou bbox.",
+      parameters: {
+        type: "object",
+        properties: {
+          endpoint: {
+            type: "string",
+            enum: ["qualite_rivieres", "hydrometrie", "piezometrie"],
+            description: "Type de stations à récupérer",
+          },
+          codeCommune: { type: "string", description: "Code INSEE commune (ex: 35238)" },
+          codeDepartement: { type: "string", description: "Code département (ex: 35)" },
+          bbox: {
+            type: "array",
+            items: { type: "number" },
+            minItems: 4,
+            maxItems: 4,
+            description: "Bbox WGS84 [minLon, minLat, maxLon, maxLat]",
+          },
+          size: { type: "number", description: "Limite résultats (défaut 200, max 20000)" },
+          layerName: { type: "string", description: "Nom de couche QGIS" },
+        },
+        required: ["endpoint"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "loadGbifOccurrences",
+      description:
+        "Charger des occurrences d'espèces GBIF (biodiversité mondiale) géoréférencées en couche QGIS.",
+      parameters: {
+        type: "object",
+        properties: {
+          scientificName: { type: "string", description: "Nom scientifique (ex: Quercus robur)" },
+          taxonKey: { type: "number", description: "Clé taxon GBIF" },
+          country: { type: "string", description: "Code pays ISO (ex: FR)" },
+          bbox: {
+            type: "array",
+            items: { type: "number" },
+            minItems: 4,
+            maxItems: 4,
+            description: "Bbox WGS84 [minLon, minLat, maxLon, maxLat]",
+          },
+          yearStart: { type: "number" },
+          yearEnd: { type: "number" },
+          limit: { type: "number", description: "Max résultats (défaut 100, max 300)" },
+          layerName: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "loadDvfTransactions",
+      description:
+        "Charger les transactions immobilières DVF (data.gouv.fr) géoréférencées sur une commune ou code postal en couche QGIS.",
+      parameters: {
+        type: "object",
+        properties: {
+          codeCommune: { type: "string", description: "Code INSEE commune" },
+          codePostal: { type: "string", description: "Code postal" },
+          section: { type: "string", description: "Section cadastrale" },
+          natureMutation: {
+            type: "string",
+            description: "Nature mutation (Vente, VEFA, Echange...)",
+          },
+          typeLocal: {
+            type: "string",
+            description: "Maison | Appartement | Local | Dépendance",
+          },
+          limit: { type: "number", description: "Max transactions (défaut 500)" },
+          layerName: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 function requireString(
@@ -1544,6 +1636,74 @@ export async function executeQgisToolCall(
         systematic: typeof args.systematic === "boolean" ? args.systematic : true,
       });
       return { ...result } as Record<string, unknown>;
+    }
+    case "loadHubEauStations": {
+      const endpoint = requireString(args, "endpoint", "L'endpoint Hub'Eau") as HubEauEndpoint;
+      const result = await fetchHubEauStations({
+        endpoint,
+        codeCommune: typeof args.codeCommune === "string" ? args.codeCommune : undefined,
+        codeDepartement: typeof args.codeDepartement === "string" ? args.codeDepartement : undefined,
+        bbox: Array.isArray(args.bbox) && args.bbox.length === 4
+          ? (args.bbox as [number, number, number, number])
+          : undefined,
+        size: typeof args.size === "number" ? args.size : undefined,
+      });
+      const layerName =
+        typeof args.layerName === "string" && args.layerName.trim()
+          ? args.layerName.trim()
+          : `HubEau_${endpoint}`;
+      const status = await addGeoJsonLayer(JSON.stringify(result.geojson), layerName);
+      return {
+        ok: result.ok,
+        count: result.count,
+        message: result.message,
+        layer: status ?? layerName,
+      };
+    }
+    case "loadGbifOccurrences": {
+      const result = await fetchGbifOccurrences({
+        scientificName: typeof args.scientificName === "string" ? args.scientificName : undefined,
+        taxonKey: typeof args.taxonKey === "number" ? args.taxonKey : undefined,
+        country: typeof args.country === "string" ? args.country : undefined,
+        bbox: Array.isArray(args.bbox) && args.bbox.length === 4
+          ? (args.bbox as [number, number, number, number])
+          : undefined,
+        yearStart: typeof args.yearStart === "number" ? args.yearStart : undefined,
+        yearEnd: typeof args.yearEnd === "number" ? args.yearEnd : undefined,
+        limit: typeof args.limit === "number" ? args.limit : undefined,
+      });
+      const layerName =
+        typeof args.layerName === "string" && args.layerName.trim()
+          ? args.layerName.trim()
+          : `GBIF_${typeof args.scientificName === "string" ? args.scientificName.replace(/\s+/g, "_") : "occurrences"}`;
+      const status = await addGeoJsonLayer(JSON.stringify(result.geojson), layerName);
+      return {
+        ok: result.ok,
+        count: result.count,
+        message: result.message,
+        layer: status ?? layerName,
+      };
+    }
+    case "loadDvfTransactions": {
+      const result = await fetchDvfTransactions({
+        codeCommune: typeof args.codeCommune === "string" ? args.codeCommune : undefined,
+        codePostal: typeof args.codePostal === "string" ? args.codePostal : undefined,
+        section: typeof args.section === "string" ? args.section : undefined,
+        natureMutation: typeof args.natureMutation === "string" ? args.natureMutation : undefined,
+        typeLocal: typeof args.typeLocal === "string" ? args.typeLocal : undefined,
+        limit: typeof args.limit === "number" ? args.limit : undefined,
+      });
+      const layerName =
+        typeof args.layerName === "string" && args.layerName.trim()
+          ? args.layerName.trim()
+          : `DVF_${args.codeCommune ?? args.codePostal ?? "transactions"}`;
+      const status = await addGeoJsonLayer(JSON.stringify(result.geojson), layerName);
+      return {
+        ok: result.ok,
+        count: result.count,
+        message: result.message,
+        layer: status ?? layerName,
+      };
     }
     default:
       throw new Error(`Outil QGIS inconnu: ${name}`);
