@@ -778,6 +778,10 @@ export default function App() {
           layerContext,
           workspaceSnapshot,
         );
+        const attachedImages = useDocumentStore
+          .getState()
+          .documents.filter((d) => d.kind === "image" && typeof d.dataUrl === "string")
+          .map((d) => ({ name: d.name, dataUrl: d.dataUrl as string }));
         const assistantContent = await generateAssistantReply({
           conversation: conversationSnapshot,
           latestUserMessage: trimmed,
@@ -785,6 +789,7 @@ export default function App() {
           prompt,
           settings: currentSettings,
           signal: abortController.signal,
+          attachedImages,
           transcript: buildRecentTranscript(conversationSnapshot),
         });
         const assistantContentWithAutoExecution =

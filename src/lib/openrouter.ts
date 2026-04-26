@@ -13,6 +13,7 @@ import {
 import {
   calculateMaxTokens,
 } from "./openrouter-models";
+import { buildOpenRouterUserContent, filterValidImages } from "./vision-multipart";
 
 export interface AgentTraceEntry {
   agent: "retriever" | "planner" | "planner_deep" | "reviewer" | "executor";
@@ -39,6 +40,8 @@ interface GenerateOpenRouterReplyInput {
   transcript: string;
   settings: AppSettings;
   signal?: AbortSignal;
+  /** Images attachees pour modeles vision (GPT-4o, Claude 3.5+) */
+  attachedImages?: Array<{ name: string; dataUrl: string }>;
 }
 
 interface OpenRouterToolCall {
@@ -50,9 +53,15 @@ interface OpenRouterToolCall {
   };
 }
 
+interface OpenAiContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: { url: string; detail?: "auto" | "low" | "high" };
+}
+
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content?: string;
+  content?: string | OpenAiContentPart[];
   tool_call_id?: string;
   tool_calls?: OpenRouterToolCall[];
   name?: string;
@@ -166,10 +175,19 @@ function estimateTokens(text: string): number {
 /**
  * Estime le nombre total de tokens dans les messages
  */
+function contentToText(content: string | OpenAiContentPart[] | undefined): string {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  return content
+    .filter((p) => p.type === "text" && typeof p.text === "string")
+    .map((p) => p.text)
+    .join(" ");
+}
+
 function estimateMessageTokens(messages: OpenRouterMessage[]): number {
   return messages.reduce((total, msg) => {
     if (msg.content) {
-      return total + estimateTokens(msg.content);
+      return total + estimateTokens(contentToText(msg.content));
     }
     return total;
   }, 0);
@@ -343,7 +361,7 @@ function summarizeToolMessages(messages: OpenRouterMessage[], limit = 4): string
 
   return toolMessages
     .map((message, index) => {
-      const content = summarizeForTrace(message.content || "");
+      const content = summarizeForTrace(contentToText(message.content));
       return `- Resultat outil ${index + 1}: ${content}`;
     })
     .join("\n");
@@ -1245,14 +1263,17 @@ export async function generateOpenRouterReply(
       },
       {
         role: "user",
-        content: [
-          `Stratégie validée :\n${formatPlanAsMarkdown(reviewedPlan).substring(0, 3000)}`,
-          relevantContext
-            ? `Contexte SIG du projet :\n${relevantContext.substring(0, 2000)}`
-            : "Pas de contexte de couches disponible.",
-          `Demande de l'utilisateur :\n${input.latestUserMessage}`,
-          "Exécute la stratégie étape par étape. Vérifie l'état réel via les outils avant chaque action importante.",
-        ].join("\n\n"),
+        content: buildOpenRouterUserContent(
+          [
+            `Stratégie validée :\n${formatPlanAsMarkdown(reviewedPlan).substring(0, 3000)}`,
+            relevantContext
+              ? `Contexte SIG du projet :\n${relevantContext.substring(0, 2000)}`
+              : "Pas de contexte de couches disponible.",
+            `Demande de l'utilisateur :\n${input.latestUserMessage}`,
+            "Exécute la stratégie étape par étape. Vérifie l'état réel via les outils avant chaque action importante.",
+          ].join("\n\n"),
+          filterValidImages(input.attachedImages || []),
+        ),
       },
     ];
   let executor = await runChatCompletion({

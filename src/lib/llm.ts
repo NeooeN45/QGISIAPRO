@@ -15,6 +15,7 @@ import { orchestrateResponse } from "./multi-model-orchestrator";
 import { useThinkingStore } from "../stores/useThinkingStore";
 import { useStreamingStore, createMessageId } from "../stores/useStreamingStore";
 import { useSmartSuggestionsStore } from "../stores/useSmartSuggestionsStore";
+import { buildGeminiParts, filterValidImages } from "./vision-multipart";
 
 interface GenerateAssistantReplyInput {
   conversation: ChatConversation;
@@ -24,6 +25,8 @@ interface GenerateAssistantReplyInput {
   signal?: AbortSignal;
   settings: AppSettings;
   transcript: string;
+  /** Images attachees par l'utilisateur (envoyees aux modeles vision) */
+  attachedImages?: Array<{ name: string; dataUrl: string }>;
 }
 
 interface RepairPythonScriptInput {
@@ -755,8 +758,13 @@ export async function generateAssistantReply(
     }
 
     const chat = getGeminiChat(settings);
+    const validImages = filterValidImages(input.attachedImages || []);
+    const message =
+      validImages.length > 0
+        ? buildGeminiParts(input.prompt, validImages)
+        : input.prompt;
     const response = await chat.sendMessage({
-      message: input.prompt,
+      message,
       config: {
         ...buildGeminiConfig(settings),
         abortSignal: input.signal,
@@ -775,6 +783,7 @@ export async function generateAssistantReply(
       transcript: input.transcript,
       settings,
       signal: input.signal,
+      attachedImages: input.attachedImages,
     });
 
     return result.text || "OpenRouter n'a pas renvoye de contenu exploitable.";

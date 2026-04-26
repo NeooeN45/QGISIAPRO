@@ -9,6 +9,7 @@ import { useStreamingStore } from "../stores/useStreamingStore";
 import { useThinkingStore } from "../stores/useThinkingStore";
 import { cn } from "@/src/lib/utils";
 import { Loader2, Sparkles } from "lucide-react";
+import ReasoningPhasesView from "./ReasoningPhasesView";
 
 interface StreamingMessageProps {
   className?: string;
@@ -96,17 +97,16 @@ export default function StreamingMessage({ className }: StreamingMessageProps) {
               </div>
             )}
 
-            {/* Texte streaming avec curseur */}
+            {/* Texte streaming : phases [PLAN]/[EXECUTE]/[VERIFY]/[REPORT]
+                en bulles distinctes si presentes, sinon texte brut */}
             <div
               ref={scrollRef}
               className="prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[60vh] scrollbar-thin"
             >
-              <div className="text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed font-light">
-                {streamedText}
-                {isStreaming && (
-                  <span className="inline-block w-2 h-5 bg-emerald-400 ml-0.5 align-middle animate-pulse" />
-                )}
-              </div>
+              <ReasoningPhasesView
+                text={streamedText}
+                isStreaming={isStreaming}
+              />
             </div>
 
             {/* Footer simple - disparaît quand streaming terminé */}

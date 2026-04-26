@@ -6,6 +6,8 @@ import { cn } from "@/src/lib/utils";
 import { ChatMessage } from "../lib/chat-history";
 import CodeBlock from "./CodeBlock";
 import { useConversationStore } from "../stores/useConversationStore";
+import { parseReasoning } from "../lib/reasoning-parser";
+import ReasoningPhasesView from "./ReasoningPhasesView";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -59,33 +61,38 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
               : "",
           )}
         >
-          <ReactMarkdown
-            components={{
-              code({ className, children, ...codeProps }) {
-                const match = /language-(\w+)/.exec(className || "");
-                const isInline = !match;
+          {message.role === "assistant" &&
+          parseReasoning(message.content).hasStructuredReasoning ? (
+            <ReasoningPhasesView text={message.content} />
+          ) : (
+            <ReactMarkdown
+              components={{
+                code({ className, children, ...codeProps }) {
+                  const match = /language-(\w+)/.exec(className || "");
+                  const isInline = !match;
 
-                return !isInline ? (
-                  <CodeBlock
-                    language={match[1]}
-                    value={String(children).replace(/\n$/, "")}
-                  />
-                ) : (
-                  <code
-                    className={cn(
-                      "rounded-md bg-gray-200 dark:bg-[#333537] px-2 py-0.5 font-mono text-xs font-bold text-blue-600 dark:text-blue-300",
-                      className,
-                    )}
-                    {...codeProps}
-                  >
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
+                  return !isInline ? (
+                    <CodeBlock
+                      language={match[1]}
+                      value={String(children).replace(/\n$/, "")}
+                    />
+                  ) : (
+                    <code
+                      className={cn(
+                        "rounded-md bg-gray-200 dark:bg-[#333537] px-2 py-0.5 font-mono text-xs font-bold text-blue-600 dark:text-blue-300",
+                        className,
+                      )}
+                      {...codeProps}
+                    >
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
         </div>
         {message.role === "assistant" && (
           <div className="mt-2 flex items-center gap-2">
