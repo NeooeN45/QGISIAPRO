@@ -1187,6 +1187,85 @@ class QgisBridge(BridgeQObject):
         self._notify(message, Qgis.Success)
         return message
 
+    @BridgeSlot(str, result=str)
+    def forecastWeatherWithEarth2(self, options_json):
+        """
+        Lance une prevision meteo Earth-2 et charge les GeoTIFF resultats
+        comme couches raster QGIS.
+
+        options_json : JSON serialise avec outputDir, model, initTime,
+        leadHours, variables, layerPrefix.
+        """
+        try:
+            opts = json.loads(options_json) if options_json else {}
+        except json.JSONDecodeError:
+            message = "Options Earth-2 invalides (JSON malforme)."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        output_dir = str(opts.get("outputDir") or "").strip()
+        if not output_dir:
+            message = "outputDir est requis."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        try:
+            from .earth2_tool import (
+                forecast_weather,
+                Earth2UnavailableError,
+            )
+        except ImportError as e:
+            message = f"Module earth2_tool indisponible : {e}"
+            self._notify(message, Qgis.Critical)
+            return message
+
+        try:
+            result = forecast_weather(
+                output_dir,
+                model=opts.get("model") or "fcn",
+                init_time=opts.get("initTime"),
+                lead_hours=int(opts.get("leadHours") or 24),
+                variables=opts.get("variables"),
+            )
+        except Earth2UnavailableError as e:
+            message = (
+                f"Earth-2 indisponible : {e}. "
+                "Installe via 'pip install earth2studio xarray rioxarray torch'."
+            )
+            self._notify(message, Qgis.Critical)
+            return message
+        except ValueError as e:
+            message = f"Parametres Earth-2 invalides : {e}"
+            self._notify(message, Qgis.Warning)
+            return message
+        except Exception as e:  # noqa: BLE001
+            message = f"Echec prevision Earth-2 : {e}"
+            self._notify(message, Qgis.Critical)
+            return message
+
+        # Charge chaque GeoTIFF comme couche raster
+        layer_prefix = str(opts.get("layerPrefix") or "Earth2").strip()
+        loaded = 0
+        for tif_path in result.geotiff_paths:
+            try:
+                var_name = Path(tif_path).stem
+                layer = QgsRasterLayer(tif_path, f"{layer_prefix}_{var_name}", "gdal")
+                if self._add_layer_to_project(layer, layer.name()) is not None:
+                    loaded += 1
+            except Exception as e:  # noqa: BLE001
+                QgsMessageLog.logMessage(
+                    f"Earth-2 : couche {tif_path} non chargee : {e}",
+                    "QGISIA+",
+                    Qgis.Warning,
+                )
+
+        message = (
+            f"{loaded}/{len(result.geotiff_paths)} previsions Earth-2 chargees "
+            f"(modele={result.model}, +{result.lead_hours}h, {result.duration_s:.1f}s)."
+        )
+        self._notify(message, Qgis.Success)
+        return message
+
     @BridgeSlot(str, str, result=str)
     def applyParcelStylePreset(self, layer_ref, preset_id):
         layer = self._find_layer(layer_ref)
@@ -2127,6 +2206,11 @@ class ThreadedAssetServer:
             elif route == "/api/qgis/segmentRasterWithSAM":
                 result = self._bridge_call(
                     "segmentRasterWithSAM",
+                    body.get("options", ""),
+                )
+            elif route == "/api/qgis/forecastWeatherWithEarth2":
+                result = self._bridge_call(
+                    "forecastWeatherWithEarth2",
                     body.get("options", ""),
                 )
             elif route == "/api/qgis/calculateRasterFormula":

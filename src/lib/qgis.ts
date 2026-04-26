@@ -171,6 +171,10 @@ interface RawQgisBridge {
     optionsJson: string,
     callback?: QgisCallback<string>,
   ) => string | void;
+  forecastWeatherWithEarth2?: (
+    optionsJson: string,
+    callback?: QgisCallback<string>,
+  ) => string | void;
   calculateRasterFormula?: (
     layerIdsJson: string,
     formula: string,
@@ -438,6 +442,15 @@ function getHttpBridge(): RawQgisBridge | undefined {
     },
     segmentRasterWithSAM: (optionsJson, callback) => {
       void postJson<string>("/api/qgis/segmentRasterWithSAM", {
+        options: optionsJson,
+      }).then((result) => {
+        if (callback) {
+          callback(typeof result === "string" ? result : "");
+        }
+      });
+    },
+    forecastWeatherWithEarth2: (optionsJson, callback) => {
+      void postJson<string>("/api/qgis/forecastWeatherWithEarth2", {
         options: optionsJson,
       }).then((result) => {
         if (callback) {
@@ -1319,6 +1332,37 @@ export async function segmentRasterWithSAM(
       bridge.segmentRasterWithSAM?.(JSON.stringify(options), callback),
     "",
     QGIS_SCRIPT_TIMEOUT_MS, // segmentation is slow → script timeout
+  );
+  return typeof result === "string" && result.length > 0 ? result : null;
+}
+
+export interface Earth2ForecastOptions {
+  /** Dossier de sortie pour les GeoTIFF */
+  outputDir: string;
+  /** Modèle : fcn (défaut) | pangu | aifs | graphcast */
+  model?: "fcn" | "pangu" | "aifs" | "graphcast";
+  /** Heure d'init ISO 8601 UTC (défaut : dernier pivot 6h) */
+  initTime?: string;
+  /** Horizon de prévision en heures (1-240, défaut 24) */
+  leadHours?: number;
+  /** Variables : t2m, msl, u10, v10, tp, etc. */
+  variables?: string[];
+  /** Préfixe des couches QGIS (défaut "Earth2") */
+  layerPrefix?: string;
+}
+
+export async function forecastWeatherWithEarth2(
+  options: Earth2ForecastOptions,
+): Promise<string | null> {
+  const bridge = getBridge();
+  if (!bridge?.forecastWeatherWithEarth2) {
+    return null;
+  }
+  const result = await callQgisWithResult<string>(
+    (callback) =>
+      bridge.forecastWeatherWithEarth2?.(JSON.stringify(options), callback),
+    "",
+    QGIS_SCRIPT_TIMEOUT_MS, // forecast is slow (model loading + inference)
   );
   return typeof result === "string" && result.length > 0 ? result : null;
 }

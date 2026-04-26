@@ -20,6 +20,7 @@ import {
   reprojectLayer,
   runScript,
   segmentRasterWithSAM,
+  forecastWeatherWithEarth2,
   setLayerLabels,
   setLayerOpacity,
   setLayerVisibility,
@@ -1012,6 +1013,47 @@ const OPENAI_QGIS_TOOLS: OpenAiToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "forecastWeatherWithEarth2",
+      description:
+        "Lancer une prevision meteo globale via NVIDIA Earth-2 Studio (FourCastNet, Pangu, AIFS, GraphCast). Genere des GeoTIFF par variable (temperature, vent, pression, precipitations) chargees comme couches raster QGIS. Necessite earth2studio + torch cote backend.",
+      parameters: {
+        type: "object",
+        properties: {
+          outputDir: {
+            type: "string",
+            description: "Dossier de sortie pour les GeoTIFF",
+          },
+          model: {
+            type: "string",
+            enum: ["fcn", "pangu", "aifs", "graphcast"],
+            description: "Modele IA : fcn (defaut, rapide) | pangu | aifs | graphcast",
+          },
+          initTime: {
+            type: "string",
+            description: "Heure init ISO 8601 UTC (ex: 2026-04-26T00:00:00Z, defaut: dernier pivot 6h)",
+          },
+          leadHours: {
+            type: "number",
+            description: "Horizon de prevision en heures (1-240, defaut 24)",
+          },
+          variables: {
+            type: "array",
+            items: { type: "string" },
+            description: "Variables a prevoir (t2m, msl, u10, v10, tp, tcwv, z500, t850...)",
+          },
+          layerPrefix: {
+            type: "string",
+            description: "Prefixe des couches QGIS (defaut Earth2)",
+          },
+        },
+        required: ["outputDir"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "segmentRasterWithSAM",
       description:
         "Segmenter un raster (image satellite, orthophoto) avec Segment Anything (SAM). Génère des polygones GeoJSON soit automatiquement (tous masques), soit guidés par prompt texte (ex: 'trees', 'buildings', 'water'). Nécessite samgeo + torch côté backend.",
@@ -1725,6 +1767,38 @@ export async function executeQgisToolCall(
         count: result.count,
         message: result.message,
         layer: status ?? layerName,
+      };
+    }
+    case "forecastWeatherWithEarth2": {
+      const outputDir = requireString(args, "outputDir", "Le dossier de sortie");
+      const model =
+        args.model === "fcn" ||
+        args.model === "pangu" ||
+        args.model === "aifs" ||
+        args.model === "graphcast"
+          ? args.model
+          : undefined;
+      const variables =
+        Array.isArray(args.variables) && args.variables.every((v) => typeof v === "string")
+          ? (args.variables as string[])
+          : undefined;
+      const status = await forecastWeatherWithEarth2({
+        outputDir,
+        model,
+        initTime: typeof args.initTime === "string" ? args.initTime : undefined,
+        leadHours: typeof args.leadHours === "number" ? args.leadHours : undefined,
+        variables,
+        layerPrefix: typeof args.layerPrefix === "string" ? args.layerPrefix : undefined,
+      });
+      if (!status) {
+        throw new Error(
+          "Earth-2 indisponible (earth2studio/torch absent ou erreur backend).",
+        );
+      }
+      return {
+        ok: true,
+        tool: "forecastWeatherWithEarth2",
+        status,
       };
     }
     case "segmentRasterWithSAM": {
