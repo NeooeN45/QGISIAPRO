@@ -3,9 +3,9 @@
   "agent": {},
   "sessions": [
     {
-      "session_id": "session_2239f2dd",
-      "started_at": 1777208328.7991998,
-      "ended_at": 1777208328.7991998,
+      "session_id": "session_685e15ea",
+      "started_at": 1777209916.2561994,
+      "ended_at": 1777209916.2561994,
       "message_count": 4,
       "topics": [
         "couche",
@@ -23,8 +23,8 @@
     },
     {
       "session_id": "session_test_blocked",
-      "started_at": 1777208328.801808,
-      "ended_at": 1777208328.801808,
+      "started_at": 1777209916.2582774,
+      "ended_at": 1777209916.2582774,
       "message_count": 2,
       "topics": [],
       "layers_used": [],
