@@ -28,7 +28,7 @@ import { useUIStore } from "../stores/useUIStore";
 import { useDocumentStore } from "../stores/useDocumentStore";
 import { appendDebugEvent } from "../lib/debug-log";
 import { toast } from "sonner";
-import { extractTextFromFile, formatFileSize, getFileIcon } from "../lib/document-utils";
+import { extractFileForLLM, formatFileSize, getFileIcon } from "../lib/document-utils";
 
 interface QuickTest {
   label: string;
@@ -179,17 +179,20 @@ export default function ChatInput({
     
     for (const file of files) {
       try {
-        const content = await extractTextFromFile(file);
+        const extracted = await extractFileForLLM(file);
         addDocument({
           name: file.name,
           type: file.type,
           size: file.size,
-          content,
+          content: extracted.content,
+          dataUrl: extracted.dataUrl,
+          kind: extracted.kind,
         });
-        toast.success(`Fichier "${file.name}" ajouté avec succès`);
+        const label = extracted.kind === "image" ? "Image" : "Fichier";
+        toast.success(`${label} "${file.name}" ajoute au contexte`);
       } catch (error) {
         console.error("Error extracting text from file:", error);
-        toast.error(`Erreur lors de l'extraction du texte de ${file.name}`);
+        toast.error(`Erreur lors de l'extraction de ${file.name}`);
       }
     }
     
@@ -311,16 +314,10 @@ export default function ChatInput({
                   conversationMode === "free"
                     ? "Posez n'importe quelle question, discutez librement..."
                     : selectedLayers.length > 0
-                      ? conversationMode === "plan"
-                        ? `Décrivez le plan à préparer pour ${selectedLayers
-                            .map((layer) => layer.name)
-                            .join(", ")}...`
-                        : `Posez votre question en restant focalisé sur ${selectedLayers
-                            .map((layer) => layer.name)
-                            .join(", ")}...`
-                      : conversationMode === "plan"
-                        ? "Décrivez le traitement à planifier..."
-                        : "Décrivez votre tâche SIG ou demandez un script..."
+                      ? `Posez votre question en restant focalisé sur ${selectedLayers
+                          .map((layer) => layer.name)
+                          .join(", ")}...`
+                      : "Décrivez votre tâche SIG ou demandez un script..."
                 }
                 rows={1}
                 className="chat-scrollbar max-h-56 flex-1 resize-none border-none bg-transparent px-2 py-3 text-base font-medium text-gray-900 dark:text-white outline-none placeholder:text-gray-500 dark:placeholder:text-[#8e918f]"
@@ -339,7 +336,7 @@ export default function ChatInput({
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept=".txt,.md,.csv,.json,.xml,.js,.py,.ts,.tsx,.jsx,.sql,.sh,.pdf,.docx,.xlsx"
+                  accept=".txt,.md,.csv,.json,.xml,.js,.py,.ts,.tsx,.jsx,.sql,.sh,.pdf,.docx,.xlsx,.png,.jpg,.jpeg,.webp,.gif,image/*"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -448,7 +445,7 @@ export default function ChatInput({
               : "border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-muted)]"
           }`}>
             <Sparkles size={12} className={conversationMode === "free" ? "text-violet-400" : "text-emerald-400"} />
-            {conversationMode === "plan" ? "Mode plan" : conversationMode === "free" ? "Mode libre" : "Mode action"}
+            {conversationMode === "free" ? "Mode libre" : "Mode action"}
           </div>
         </div>
       </div>

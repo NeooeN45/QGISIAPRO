@@ -6,7 +6,7 @@ export function conversationToMarkdown(conversation: ChatConversation): string {
   lines.push(`# ${conversation.title || "Conversation sans titre"}`);
   lines.push("");
   lines.push(
-    `> Mode : **${conversation.mode === "plan" ? "Plan" : "Action"}** — ` +
+    `> Mode : **${conversation.mode === "free" ? "Libre" : "Action"}** — ` +
       `${conversation.messages.length} message(s) — ` +
       `Créée le ${new Date(conversation.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}`,
   );

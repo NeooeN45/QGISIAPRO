@@ -6,7 +6,14 @@ export interface ChatMessage {
   feedback?: "like" | "dislike" | null;
 }
 
-export type ConversationMode = "chat" | "plan" | "free";
+/**
+ * Modes de conversation :
+ *  - "chat" : agent SIG actif, peut modifier QGIS (charger couches, lancer scripts, etc.)
+ *  - "free" : assistant conversationnel libre, sans accès aux outils QGIS
+ *
+ * Le mode "plan" historique est déprécié et migré automatiquement vers "chat".
+ */
+export type ConversationMode = "chat" | "free";
 export type LayerContextScope = "layer" | "selection";
 
 export interface LayerContextConfig {
@@ -105,7 +112,8 @@ function normalizeConversation(
               .map(([layerId, scope]) => [layerId, scope as LayerContextScope]),
           )
         : {},
-    mode: input.mode === "plan" ? "plan" : "chat",
+    // Migration: ancien mode "plan" → "chat" (action). Mode "free" preserve.
+    mode: input.mode === "free" ? "free" : "chat",
   };
 }
 

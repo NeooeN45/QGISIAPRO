@@ -1,12 +1,19 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type DocumentKind = "text" | "image";
+
 export interface Document {
   id: string;
   name: string;
   type: string;
   size: number;
+  /** Texte extrait pour les documents textuels (vide pour les images) */
   content: string;
+  /** Data URL base64 pour les images (modeles vision) */
+  dataUrl?: string;
+  /** Categorie du document, pour traitement different selon LLM (defaut: "text") */
+  kind?: DocumentKind;
   uploadedAt: number;
 }
 

@@ -12,6 +12,7 @@ import IntroAnimation from "./components/IntroAnimation";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import {
   ChatConversation,
+  ConversationMode,
   createMessage,
 } from "./lib/chat-history";
 import {
@@ -33,6 +34,7 @@ import { QGIS_TOOLS_REFERENCE } from "./lib/qgis-tools-reference";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useConversationStore } from "./stores/useConversationStore";
 import { useLayerStore } from "./stores/useLayerStore";
+import { useDocumentStore } from "./stores/useDocumentStore";
 import { useUIStore } from "./stores/useUIStore";
 import { exportConversationToMarkdown, downloadFile } from "./lib/conversation-export";
 
@@ -182,12 +184,57 @@ function buildWorkspaceSnapshot(layers: LayerSummary[]): string {
     .join("\n\n");
 }
 
+function buildAttachmentsContext(): string {
+  // Recupere les documents attaches par l'utilisateur (PDF, DOCX, texte, images)
+  // depuis le store global. Les images sont injectees separement via vision.
+  const documents = useDocumentStore.getState().documents;
+  if (documents.length === 0) return "";
+
+  const textuals = documents.filter((d) => d.kind !== "image" && d.content.trim().length > 0);
+  const images = documents.filter((d) => d.kind === "image");
+
+  const blocks: string[] = ["## Pieces jointes fournies par l'utilisateur"];
+
+  if (images.length > 0) {
+    blocks.push(
+      `\n${images.length} image(s) jointe(s) (visibles uniquement par les modeles vision) : ${images
+        .map((i) => i.name)
+        .join(", ")}`,
+    );
+  }
+
+  // Limite pour eviter de saturer le contexte (~150 Ko total max).
+  const MAX_TOTAL = 150_000;
+  let used = 0;
+  for (const doc of textuals) {
+    const remaining = MAX_TOTAL - used;
+    if (remaining < 500) {
+      blocks.push(`\n[... ${textuals.length - blocks.length + 1} document(s) tronques ...]`);
+      break;
+    }
+    const content =
+      doc.content.length > remaining
+        ? `${doc.content.slice(0, remaining - 200)}\n[... tronque ...]`
+        : doc.content;
+    used += content.length;
+    blocks.push(
+      `\n### ${doc.name} (${(doc.size / 1024).toFixed(1)} Ko)\n` +
+        "```\n" +
+        content +
+        "\n```",
+    );
+  }
+
+  return blocks.join("\n");
+}
+
 function buildModelPrompt(
   conversation: ChatConversation,
   layerContext: string,
   workspaceSnapshot: string,
 ): string {
   const transcript = buildRecentTranscript(conversation);
+  const attachmentsContext = buildAttachmentsContext();
 
   const modeInstruction =
     conversation.mode === "free"
@@ -201,18 +248,6 @@ function buildModelPrompt(
           "- Tu peux partager des opinions argumentees si demande.",
           "- Pas de blocs de code PyQGIS, pas d'outils bridge, pas de references QGIS.",
           "- Longueur adaptee : courte pour les questions simples, detaillee pour les sujets complexes.",
-        ].join("\n")
-      : conversation.mode === "plan"
-      ? [
-          "Tu es l'agent planificateur de QGISIA+. Reponds en francais.",
-          "ROLE : analyser la demande et produire un plan d'execution detaille et realiste.",
-          "REGLES :",
-          "- N'invente JAMAIS de couches, champs, CRS, statistiques ou resultats absents du contexte.",
-          "- N'affirme jamais un proprietaire de parcelle sans source publique explicite.",
-          "- Si donnees francaises : indique systematiquement la reprojection en Lambert 93 (EPSG:2154).",
-          "- Quand plusieurs taches sont demandees, planifie-les TOUTES dans l'ordre optimal.",
-          "- Indique les outils bridge a utiliser ET les endroits ou PyQGIS est necessaire.",
-          "FORMAT DE REPONSE : sections Objectif | Couches concernees | Plan etape par etape (outil + parametre) | Risques | Validation attendue.",
         ].join("\n")
       : [
           "Tu es l'agent operateur de QGISIA+. Reponds en francais.",
@@ -233,10 +268,13 @@ function buildModelPrompt(
   if (conversation.mode === "free") {
     return [
       modeInstruction,
+      attachmentsContext,
       "",
       "Historique récent de la conversation :",
       transcript,
-    ].join("\n\n");
+    ]
+      .filter((s) => s !== "" && s !== undefined)
+      .join("\n\n");
   }
 
   return [
@@ -247,14 +285,15 @@ function buildModelPrompt(
     workspaceSnapshot,
     "",
     layerContext || "Aucune couche n'est attachée explicitement au contexte de cette discussion.",
+    attachmentsContext,
     "",
     "Historique récent de la conversation :",
     transcript,
     "",
-    conversation.mode === "plan"
-      ? "Reste au niveau planifié et demande validation avant action lourde."
-      : "Donne une réponse opérationnelle, concise et exploitable dans QGIS.",
-  ].join("\n\n");
+    "Donne une réponse opérationnelle, concise et exploitable dans QGIS.",
+  ]
+    .filter((s) => s !== "" && s !== undefined)
+    .join("\n\n");
 }
 
 function buildRecentTranscript(conversation: ChatConversation): string {
@@ -419,7 +458,7 @@ async function maybeAutoExecuteAssistantPythonScript(input: {
     workspaceSnapshot,
   } = input;
 
-  if (!settings.autoExecutePythonScripts || conversation.mode === "plan" || conversation.mode === "free") {
+  if (!settings.autoExecutePythonScripts || conversation.mode === "free") {
     return assistantContent;
   }
 
@@ -810,7 +849,7 @@ export default function App() {
   }, []);
 
   const handleSetConversationMode = useCallback(
-    (mode: "chat" | "plan") => {
+    (mode: ConversationMode) => {
       convStore.getState().setMode(mode);
     },
     [],
@@ -1008,11 +1047,11 @@ export default function App() {
     {
       id: "toggle-mode",
       label: "Changer de mode",
-      description: "Basculer entre mode Discussion et Plan",
+      description: "Basculer entre mode Action (QGIS) et mode Libre",
       icon: <Sparkles size={18} />,
       action: () => {
         const currentMode = activeConversation?.mode || "chat";
-        handleSetConversationMode(currentMode === "chat" ? "plan" : "chat");
+        handleSetConversationMode(currentMode === "chat" ? "free" : "chat");
       },
       category: "Conversations",
     },

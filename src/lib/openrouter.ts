@@ -32,7 +32,7 @@ export interface OpenRouterKeyInfo {
 }
 
 interface GenerateOpenRouterReplyInput {
-  conversationMode: "chat" | "plan" | "free";
+  conversationMode: "chat" | "free";
   latestUserMessage: string;
   layerContext: string;
   prompt: string;
@@ -988,7 +988,6 @@ async function runChatCompletion(
 function shouldUseDeepPlanner(input: GenerateOpenRouterReplyInput): boolean {
   if (input.conversationMode === "free") return false;
   return (
-    input.conversationMode === "plan" ||
     input.latestUserMessage.length > 320 ||
     splitLayerContextIntoChunks(input.layerContext).length > 2
   );
@@ -1061,9 +1060,7 @@ export async function generateOpenRouterReply(
         "- Raster NDVI : mergeRasterBands → calcul d'indices → export GeoTIFF",
         "- Inventaire : createInventoryGrid → placement placettes → export",
         "Respecte strictement le schéma JSON. ",
-        input.conversationMode === "plan"
-          ? "Mode PLAN : 3-7 étapes détaillées, pas d'exécution directe. Explique chaque étape."
-          : input.conversationMode === "free"
+        input.conversationMode === "free"
           ? "Mode LIBRE : discussion générale, pas d'outils SIG."
           : "Mode ACTION : 3-5 étapes concrètes et ordonnées pour l'executor.",
       ].join("\n"),
@@ -1160,67 +1157,6 @@ export async function generateOpenRouterReply(
       model: deepPlanner.model,
       output: summarizeForTrace(formatPlanAsMarkdown(workingPlan)),
     });
-  }
-
-  if (input.conversationMode === "plan") {
-    if (input.settings.openrouterAgentMode === "multi") {
-      const reviewerMessages: OpenRouterMessage[] = [
-          {
-            role: "system",
-            content: [
-              "Tu es l'agent reviewer de QGISIA+. Ton rôle : valider la qualité et la cohérence du plan.",
-              "",
-              "CRITÈRES DE VALIDATION :",
-              "- Chaque étape est-elle réalisable avec les données disponibles ?",
-              "- Les CRS sont-ils correctement gérés (reprojection si nécessaire) ?",
-              "- Les risques identifiés sont-ils traités ou mentionnés ?",
-              "- La validation_request est-elle claire et actionnable pour l'utilisateur ?",
-              "- Y a-t-il des étapes redondantes ou des incohérences à corriger ?",
-              "",
-              "Renvoie uniquement le plan corrigé et validé. Respecte le schéma JSON. N'invente pas de données.",
-            ].join("\n"),
-          },
-          {
-            role: "user",
-            content: [
-              `Plan à valider :\n${serializePlan(workingPlan).substring(0, 2500)}`,
-              `Demande originale :\n${input.latestUserMessage}`,
-            ].join("\n\n"),
-          },
-        ];
-      const reviewer = await runChatCompletion({
-        apiKey,
-        endpoint: input.settings.openrouterEndpoint,
-        model: input.settings.openrouterReviewerModel,
-        messages: reviewerMessages,
-        signal: input.signal,
-        appName: input.settings.openrouterAppName,
-        referer: input.settings.openrouterReferer,
-        responseFormat: PLAN_RESPONSE_FORMAT,
-        plugins: buildPlugins(input.settings, true),
-        provider: buildProviderPreferences(input.settings, { requireParameters: true }),
-        zdr: input.settings.openrouterOnlyZdr,
-        maxTokens: calculateRoleMaxTokens("reviewer", reviewerMessages, isFreeTier),
-        temperature: input.settings.temperature,
-        topP: input.settings.topP,
-      });
-
-      workingPlan = parseStructuredPlan(reviewer.text);
-      trace.push({
-        agent: "reviewer",
-        model: reviewer.model,
-        output: summarizeForTrace(formatPlanAsMarkdown(workingPlan)),
-      });
-    }
-
-    return {
-      text: appendTrace(
-        formatPlanAsMarkdown(workingPlan),
-        trace,
-        input.settings.openrouterShowTrace,
-      ),
-      trace,
-    };
   }
 
   let reviewedPlan = workingPlan;

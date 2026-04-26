@@ -6,7 +6,7 @@ export function exportConversationToMarkdown(conversation: ChatConversation): st
   lines.push(`# ${conversation.title || "Conversation QGISAI+"}`);
   lines.push(``);
   lines.push(`**Date:** ${new Date(conversation.createdAt).toLocaleString("fr-FR")}`);
-  lines.push(`**Mode:** ${conversation.mode === "plan" ? "Planification" : "Action"}`);
+  lines.push(`**Mode:** ${conversation.mode === "free" ? "Libre" : "Action"}`);
   lines.push(``);
   lines.push(`---`);
   lines.push(``);

@@ -137,18 +137,6 @@ export default function ChatHeader({
                   Action
                 </button>
                 <button
-                  onClick={() => onUpdateConversationMode("plan")}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-all",
-                    conversationMode === "plan"
-                      ? "bg-emerald-400 text-[#131314] shadow-sm shadow-emerald-500/30"
-                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
-                  )}
-                  title="Mode Plan : plans d'action détaillés avant exécution"
-                >
-                  Plan
-                </button>
-                <button
                   onClick={() => onUpdateConversationMode("free")}
                   className={cn(
                     "rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-all",
@@ -164,9 +152,9 @@ export default function ChatHeader({
               <button
                 className="rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all"
                 title={
-                  conversationMode === "chat" ? "Mode Action : exécute les tâches SIG directement dans QGIS avec auto-exécution PyQGIS" :
-                  conversationMode === "plan" ? "Mode Plan : plans détaillés avec validation avant exécution" :
-                  "Mode Libre : discussion générale sur n'importe quel sujet, sans outils QGIS"
+                  conversationMode === "chat"
+                    ? "Mode Action : exécute les tâches SIG directement dans QGIS avec auto-exécution PyQGIS"
+                    : "Mode Libre : discussion générale sur n'importe quel sujet, sans outils QGIS"
                 }
               >
                 <Info size={12} />

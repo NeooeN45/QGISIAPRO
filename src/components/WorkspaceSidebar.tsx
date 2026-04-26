@@ -817,11 +817,11 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                   <div className="flex items-center gap-2 mb-1">
                     <span className={cn(
                       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest",
-                      conversation.mode === "plan"
+                      conversation.mode === "free"
                         ? "bg-violet-500/15 text-violet-400 border border-violet-500/25"
                         : "bg-blue-500/15 text-blue-400 border border-blue-500/25"
                     )}>
-                      {conversation.mode === "plan" ? "Plan" : "Chat"}
+                      {conversation.mode === "free" ? "Libre" : "Action"}
                     </span>
                     <span className="text-[10px] text-gray-400 dark:text-white/30 tabular-nums">
                       {conversation.messages.length} msg

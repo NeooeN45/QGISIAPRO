@@ -150,14 +150,54 @@ export async function extractTextFromFile(file: File): Promise<string> {
     }
   }
 
-  // Images (Pas de Tesseract/OCR local pour le moment, on prévient l'utilisateur)
-  if (fileType.startsWith("image/") || fileName.endsWith(".png") || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
-    throw new Error("L'analyse des images (OCR) n'est pas encore supportée en mode hors-ligne. Veuillez convertir l'image en texte.");
+  // Images : envoyees en base64 aux modeles vision (Claude/Gemini/GPT-4o)
+  if (fileType.startsWith("image/") || fileName.endsWith(".png") || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".webp") || fileName.endsWith(".gif")) {
+    // Le contenu textuel est vide ; le data URL est porte par extractFileForLLM().
+    // Pour la retrocompatibilite, on retourne un marqueur lisible.
+    return `[IMAGE: ${file.name}] (envoyee au modele vision - le LLM peut la decrire)`;
   }
 
   throw new Error(
-    `Type de fichier non supporté: ${fileType || fileName}. Types supportés: PDF, DOCX, XLSX, TXT, MD, CSV, JSON et fichiers de code.`,
+    `Type de fichier non supporté: ${fileType || fileName}. Types supportés: PDF, DOCX, XLSX, TXT, MD, CSV, JSON, code et images (PNG/JPG/WebP).`,
   );
+}
+
+/**
+ * Extracteur enrichi : retourne content + dataUrl pour images, kind pour
+ * routage cote prompt LLM.
+ */
+export interface ExtractedFile {
+  content: string;
+  dataUrl?: string;
+  kind: "text" | "image";
+}
+
+export async function extractFileForLLM(file: File): Promise<ExtractedFile> {
+  const fileName = file.name.toLowerCase();
+  const isImage =
+    file.type.startsWith("image/") ||
+    fileName.endsWith(".png") ||
+    fileName.endsWith(".jpg") ||
+    fileName.endsWith(".jpeg") ||
+    fileName.endsWith(".webp") ||
+    fileName.endsWith(".gif");
+
+  if (isImage) {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("FileReader echec"));
+      reader.readAsDataURL(file);
+    });
+    return {
+      content: `[IMAGE: ${file.name}]`,
+      dataUrl,
+      kind: "image",
+    };
+  }
+
+  const content = await extractTextFromFile(file);
+  return { content, kind: "text" };
 }
 
 export function formatFileSize(bytes: number): string {
