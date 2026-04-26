@@ -21,6 +21,7 @@ import {
   runScript,
   segmentRasterWithSAM,
   forecastWeatherWithEarth2,
+  exportProjectReport,
   setLayerLabels,
   setLayerOpacity,
   setLayerVisibility,
@@ -1013,6 +1014,50 @@ const OPENAI_QGIS_TOOLS: OpenAiToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "exportProjectReport",
+      description:
+        "Exporter un rapport SIG du projet QGIS courant en PDF ou DOCX, incluant snapshot carte, tableau des couches (nom, CRS, n features) et sections personnalisees (texte, listes, tableaux). Utilise reportlab (PDF) ou python-docx.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Titre du rapport (obligatoire)" },
+          outputPath: { type: "string", description: "Chemin de sortie (.pdf ou .docx)" },
+          format: {
+            type: "string",
+            enum: ["pdf", "docx"],
+            description: "Format (defaut pdf)",
+          },
+          author: { type: "string" },
+          subtitle: { type: "string" },
+          includeLayers: { type: "boolean", description: "Inclure tableau couches (defaut true)" },
+          includeMap: { type: "boolean", description: "Inclure snapshot carte (defaut true)" },
+          sections: {
+            type: "array",
+            description: "Sections personnalisees",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                body: { type: "string" },
+                bullets: { type: "array", items: { type: "string" } },
+                tableHeaders: { type: "array", items: { type: "string" } },
+                tableRows: {
+                  type: "array",
+                  items: { type: "array", items: { type: "string" } },
+                },
+              },
+              required: ["title"],
+            },
+          },
+        },
+        required: ["title", "outputPath"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "forecastWeatherWithEarth2",
       description:
         "Lancer une prevision meteo globale via NVIDIA Earth-2 Studio (FourCastNet, Pangu, AIFS, GraphCast). Genere des GeoTIFF par variable (temperature, vent, pression, precipitations) chargees comme couches raster QGIS. Necessite earth2studio + torch cote backend.",
@@ -1768,6 +1813,50 @@ export async function executeQgisToolCall(
         message: result.message,
         layer: status ?? layerName,
       };
+    }
+    case "exportProjectReport": {
+      const title = requireString(args, "title", "Le titre du rapport");
+      const outputPath = requireString(args, "outputPath", "Le chemin de sortie");
+      const format =
+        args.format === "pdf" || args.format === "docx" ? args.format : undefined;
+      const sections = Array.isArray(args.sections)
+        ? (args.sections as unknown[]).map((s) => {
+            const obj = (s ?? {}) as Record<string, unknown>;
+            return {
+              title: typeof obj.title === "string" ? obj.title : "Section",
+              body: typeof obj.body === "string" ? obj.body : undefined,
+              bullets: Array.isArray(obj.bullets)
+                ? (obj.bullets as unknown[]).map((b) => String(b))
+                : undefined,
+              tableHeaders: Array.isArray(obj.tableHeaders)
+                ? (obj.tableHeaders as unknown[]).map((h) => String(h))
+                : undefined,
+              tableRows: Array.isArray(obj.tableRows)
+                ? (obj.tableRows as unknown[]).map((row) =>
+                    Array.isArray(row) ? row.map((c) => String(c)) : [],
+                  )
+                : undefined,
+            };
+          })
+        : undefined;
+      const status = await exportProjectReport({
+        title,
+        outputPath,
+        format,
+        author: typeof args.author === "string" ? args.author : undefined,
+        subtitle: typeof args.subtitle === "string" ? args.subtitle : undefined,
+        includeLayers:
+          typeof args.includeLayers === "boolean" ? args.includeLayers : undefined,
+        includeMap:
+          typeof args.includeMap === "boolean" ? args.includeMap : undefined,
+        sections,
+      });
+      if (!status) {
+        throw new Error(
+          "Export rapport indisponible (reportlab/python-docx absent ou erreur backend).",
+        );
+      }
+      return { ok: true, tool: "exportProjectReport", status };
     }
     case "forecastWeatherWithEarth2": {
       const outputDir = requireString(args, "outputDir", "Le dossier de sortie");

@@ -204,7 +204,7 @@ function buildModelPrompt(
         ].join("\n")
       : conversation.mode === "plan"
       ? [
-          "Tu es l'agent planificateur de GeoSylva AI QGIS. Reponds en francais.",
+          "Tu es l'agent planificateur de QGISIA+. Reponds en francais.",
           "ROLE : analyser la demande et produire un plan d'execution detaille et realiste.",
           "REGLES :",
           "- N'invente JAMAIS de couches, champs, CRS, statistiques ou resultats absents du contexte.",
@@ -215,7 +215,7 @@ function buildModelPrompt(
           "FORMAT DE REPONSE : sections Objectif | Couches concernees | Plan etape par etape (outil + parametre) | Risques | Validation attendue.",
         ].join("\n")
       : [
-          "Tu es l'agent operateur de GeoSylva AI QGIS. Reponds en francais.",
+          "Tu es l'agent operateur de QGISIA+. Reponds en francais.",
           "ROLE : executer les taches SIG de maniere autonome, complete et sans hesitation.",
           "PHILOSOPHIE D'AGENT :",
           "- EXECUTE sans demander permission pour chaque etape logique",
@@ -928,7 +928,7 @@ export default function App() {
   const [showOllamaWizard, setShowOllamaWizard] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showIntroAnimation, setShowIntroAnimation] = useState(
-    !localStorage.getItem("geosylva-intro-seen"),
+    !localStorage.getItem("qgisia-intro-seen"),
   );
   // Flag: trigger Ollama scan once intro is done
   const [pendingOllamaScan, setPendingOllamaScan] = useState(false);
@@ -1033,7 +1033,7 @@ export default function App() {
         {showIntroAnimation && (
           <IntroAnimation
             onComplete={() => setShowIntroAnimation(false)}
-            isFirstTime={!localStorage.getItem("geosylva-intro-seen")}
+            isFirstTime={!localStorage.getItem("qgisia-intro-seen")}
           />
         )}
       

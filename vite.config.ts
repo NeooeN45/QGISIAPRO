@@ -7,7 +7,7 @@ export default defineConfig(() => {
     base: "./",
     plugins: [react()],
     build: {
-      outDir: "qgis_plugin/web",
+      outDir: "QGISIA2/web",
       emptyOutDir: true,
       chunkSizeWarningLimit: 900,
       rollupOptions: {

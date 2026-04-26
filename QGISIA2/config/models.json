@@ -1,0 +1,187 @@
+{
+  "version": 2,
+  "aliases": {
+    "smart-default": {
+      "description": "Meilleur compromis qualite/cout pour usage general",
+      "primary": "openrouter/anthropic/claude-3.5-sonnet",
+      "fallbacks": [
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
+        "groq/llama-3.3-70b-versatile",
+        "ollama/qwen3:4b"
+      ],
+      "max_cost_usd": 0.10,
+      "temperature": 0.3
+    },
+    "fast-local": {
+      "description": "100% offline via Ollama, ultra-rapide",
+      "primary": "ollama/qwen3:4b",
+      "fallbacks": [
+        "ollama/gemma3:4b"
+      ],
+      "temperature": 0.2
+    },
+    "vision": {
+      "description": "Analyse d'images (cartes, captures, satellite, LiDAR)",
+      "primary": "nvidia_nim/microsoft/phi-3-vision-128k-instruct",
+      "fallbacks": [
+        "gemini/gemini-2.0-flash",
+        "openrouter/anthropic/claude-3.5-sonnet"
+      ],
+      "temperature": 0.2
+    },
+    "vision-premium": {
+      "description": "Analyse fine d'images haute qualite (orthophotos, plans)",
+      "primary": "gemini/gemini-2.5-flash",
+      "fallbacks": [
+        "openrouter/anthropic/claude-3.5-sonnet",
+        "nvidia_nim/microsoft/phi-3-vision-128k-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "code-pyqgis": {
+      "description": "Generation de code PyQGIS et GDAL (specialise)",
+      "primary": "openrouter/qwen/qwen-2.5-coder-32b-instruct",
+      "fallbacks": [
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
+        "openrouter/anthropic/claude-3.5-sonnet",
+        "ollama/qwen2.5-coder:7b"
+      ],
+      "temperature": 0.1
+    },
+    "intent-router": {
+      "description": "Analyse d'intention ultra-rapide (petit modele)",
+      "primary": "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
+      "fallbacks": [
+        "groq/llama-3.1-8b-instant",
+        "ollama/qwen3:4b"
+      ],
+      "temperature": 0.0
+    },
+    "nvidia-reasoning": {
+      "description": "NVIDIA Nemotron 70B reasoning - raisonnement complexe, analyses SIG",
+      "primary": "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+      "fallbacks": [
+        "openrouter/anthropic/claude-3.5-sonnet",
+        "groq/llama-3.3-70b-versatile"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-fast": {
+      "description": "NVIDIA Nemotron Mini 4B - tool calling rapide et leger",
+      "primary": "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
+      "fallbacks": [
+        "groq/llama-3.1-8b-instant",
+        "ollama/qwen3:4b"
+      ],
+      "temperature": 0.1
+    },
+    "nvidia-llama": {
+      "description": "Llama 3.1 70B via NVIDIA NIM Developer Program - polyvalent haute qualite",
+      "primary": "nvidia_nim/meta/llama-3.1-70b-instruct",
+      "fallbacks": [
+        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+        "groq/llama-3.3-70b-versatile"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-llama-large": {
+      "description": "Llama 3.1 405B via NVIDIA NIM - maximum de capacites raisonnement",
+      "primary": "nvidia_nim/meta/llama-3.1-405b-instruct",
+      "fallbacks": [
+        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+        "openrouter/anthropic/claude-3.5-sonnet"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-mixtral": {
+      "description": "Mixtral 8x22B via NVIDIA NIM - excellent rapport qualite/cout",
+      "primary": "nvidia_nim/mistralai/mixtral-8x22b-instruct-v0.1",
+      "fallbacks": [
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
+        "groq/llama-3.3-70b-versatile"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-phi": {
+      "description": "Microsoft Phi-3 Medium via NVIDIA NIM - compact et rapide",
+      "primary": "nvidia_nim/microsoft/phi-3-medium-128k-instruct",
+      "fallbacks": [
+        "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
+        "ollama/qwen3:4b"
+      ],
+      "temperature": 0.1
+    },
+    "fast-cloud": {
+      "description": "Groq LPU ultra-rapide (free tier) - ideal chat reactif",
+      "primary": "groq/llama-3.3-70b-versatile",
+      "fallbacks": [
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
+        "ollama/qwen3:4b"
+      ],
+      "temperature": 0.2
+    },
+    "ultra-fast": {
+      "description": "Cerebras WSE inference - latence record (<200ms)",
+      "primary": "cerebras/llama-3.3-70b",
+      "fallbacks": [
+        "groq/llama-3.3-70b-versatile",
+        "nvidia_nim/meta/llama-3.1-70b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "premium": {
+      "description": "Anthropic Claude en direct (bypass OpenRouter) - pour analyses pro",
+      "primary": "anthropic/claude-3-5-sonnet-latest",
+      "fallbacks": [
+        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+        "openrouter/anthropic/claude-3.5-sonnet"
+      ],
+      "temperature": 0.3
+    }
+  },
+  "nvidia_nim_catalog": {
+    "comment": "Catalogue complet NVIDIA NIM Developer Program — gratuit pour dev/test",
+    "base_url": "https://integrate.api.nvidia.com/v1",
+    "models": {
+      "text": [
+        "meta/llama-3.1-8b-instruct",
+        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.1-405b-instruct",
+        "meta/llama-3.3-70b-instruct",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "nvidia/nemotron-mini-4b-instruct",
+        "mistralai/mixtral-8x22b-instruct-v0.1",
+        "mistralai/mistral-large-2-instruct",
+        "microsoft/phi-3-medium-128k-instruct",
+        "google/gemma-2-27b-it",
+        "qwen/qwen2-72b-instruct"
+      ],
+      "vision": [
+        "microsoft/phi-3-vision-128k-instruct",
+        "nvidia/llava-v1.6-34b",
+        "meta/llama-3.2-11b-vision-instruct",
+        "meta/llama-3.2-90b-vision-instruct"
+      ],
+      "embeddings": [
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "nvidia/nv-embed-v1",
+        "nvidia/nv-embedqa-mistral-7b-v2"
+      ],
+      "reranking": [
+        "nvidia/nv-rerankqa-mistral-4b-v3"
+      ],
+      "code": [
+        "nvidia/starcoder2-15b"
+      ]
+    }
+  },
+  "budgets": {
+    "daily_max_usd": 5.00,
+    "per_request_max_usd": 0.50,
+    "warn_at_percent": 80
+  },
+  "retry": {
+    "max_attempts": 3,
+    "backoff_seconds": [1, 3, 8]
+  }
+}

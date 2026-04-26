@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Configuration du plugin GeoAI Assistant pour QGIS
+Configuration du plugin QGISIA+ pour QGIS
 """
 
 # Configuration de l'interface
 PLUGIN_CONFIG = {
-    "name": "GeoAI Assistant",
+    "name": "QGISIA+",
     "version": "2.0.0",
-    "description": "Assistant IA pour QGIS - Intégration OpenRouter",
-    "author": "GeoSylva",
+    "description": "Assistant IA pour QGIS - BYOK multi-provider",
+    "author": "QGISIA+",
     
     # Interface
-    "dock_title": "GeoAI Assistant",
+    "dock_title": "QGISIA+",
     "dock_area": "right",  # left, right, top, bottom
     "dock_width": 450,
     

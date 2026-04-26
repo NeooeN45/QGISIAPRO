@@ -138,8 +138,8 @@ class QGISAILaunchDock(QDockWidget):
         """Trouve le chemin du projet QGISAI+"""
         # Chemins possibles du projet
         possible_paths = [
-            r"c:\Users\camil\Documents\Projet\GeoSylva_AI_QGIS_OpenRouter",
-            os.path.expanduser(r"~\Documents\Projet\GeoSylva_AI_QGIS_OpenRouter"),
+            r"c:\Users\camil\Desktop\Micro Entreprise\04_PROJETS_EN_COURS\Projet\GeoSylva_AI_QGIS_OpenRouter",
+            os.path.expanduser(r"~\Desktop\Micro Entreprise\04_PROJETS_EN_COURS\Projet\GeoSylva_AI_QGIS_OpenRouter"),
             os.path.expanduser(r"~\GeoSylva_AI_QGIS_OpenRouter"),
         ]
 

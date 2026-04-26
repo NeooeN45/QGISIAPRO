@@ -44,7 +44,7 @@ export default function IntroAnimation({ onComplete, isFirstTime = false }: Intr
       setStep(step + 1);
     } else {
       if (isFirstTime) {
-        localStorage.setItem("geosylva-intro-seen", "true");
+        localStorage.setItem("qgisia-intro-seen", "true");
       }
       setIsSkipped(true);
       setTimeout(() => onComplete(), 300);
@@ -53,7 +53,7 @@ export default function IntroAnimation({ onComplete, isFirstTime = false }: Intr
 
   const handleSkip = () => {
     if (isFirstTime) {
-      localStorage.setItem("geosylva-intro-seen", "true");
+      localStorage.setItem("qgisia-intro-seen", "true");
     }
     setIsSkipped(true);
     setTimeout(() => onComplete(), 300);

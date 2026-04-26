@@ -186,12 +186,15 @@ def test_save_geotiff_raises_when_rioxarray_missing(tmp_path: Path):
     f = Earth2Forecaster()
     fake_da = MagicMock()
     fake_da.dims = ("y", "x")
-    # Force ImportError sur rioxarray
-    with patch.dict(sys.modules, {"rioxarray": None}):
-        original = sys.modules.pop("rioxarray", None)
-        try:
-            with pytest.raises(Earth2UnavailableError, match="rioxarray"):
-                f._save_geotiff(fake_da, tmp_path / "out.tif")
-        finally:
-            if original is not None:
-                sys.modules["rioxarray"] = original
+    # Force ImportError sur rioxarray via builtins.__import__
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "rioxarray":
+            raise ImportError("rioxarray not installed (mocked)")
+        return real_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=fake_import):
+        with pytest.raises(Earth2UnavailableError, match="rioxarray"):
+            f._save_geotiff(fake_da, tmp_path / "out.tif")

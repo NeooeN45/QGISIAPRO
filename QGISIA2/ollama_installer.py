@@ -98,7 +98,7 @@ class OllamaInstaller:
                     os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama\ollama.exe"),
                     os.path.expandvars(r"%ProgramFiles%\Ollama\ollama.exe"),
                     os.path.expandvars(r"%ProgramFiles(x86)%\Ollama\ollama.exe"),
-                    r"C:\Users\" + os.getlogin() + r"\AppData\Local\Programs\Ollama\ollama.exe",
+                    os.path.join(os.path.expanduser("~"), "AppData", "Local", "Programs", "Ollama", "ollama.exe"),
                 ]
                 
                 ollama_path = None

@@ -394,7 +394,11 @@ export const QGIS_TOOLS_REFERENCE_SHORT = `
 ### Raster : calculateRasterFormula, mergeRasterBands, calculateMnh
 ### Inventaire : createInventoryGrid (grille + centroïdes)
 ### Scripts : runScript (PyQGIS), runScriptDetailed (avec traceback)
-### Sources : searchCadastreParcels, searchGeoApiCommunes, searchOverpassFeatures, searchCopernicusProducts, searchNasaCatalog
+### Sources catalogue : searchCadastreParcels, searchGeoApiCommunes, searchOverpassFeatures, searchCopernicusProducts, searchNasaCatalog
+### Connecteurs REST FR (Sprint 4) : loadHubEauStations (qualité/hydro/piézo), loadGbifOccurrences (biodiversité), loadDvfTransactions (immobilier)
+### IA satellitaire (Sprint 3) : segmentRasterWithSAM (Segment Anything, mode auto ou prompt texte 'trees'/'buildings')
+### Météo IA (Sprint 4) : forecastWeatherWithEarth2 (FourCastNet/Pangu/AIFS, variables t2m/msl/u10/v10/tp, jusqu'à +240h)
+### Export rapport (Sprint 5) : exportProjectReport (PDF reportlab ou DOCX python-docx, snapshot carte + tableau couches + sections custom)
 
 ## Workflows clés
 - Zone analyse : getLayersCatalog → reprojectLayer(L93) → getLayerDiagnostics → getLayerStatistics → filterLayer → zoomToLayer → rapport
@@ -404,6 +408,11 @@ export const QGIS_TOOLS_REFERENCE_SHORT = `
 - NDVI : mergeRasterBands → calculateRasterFormula → zoomToLayer
 - MNH : calculateMnh(mnsId, mntId) → zoomToLayer
 - Inventaire : reprojectLayer(L93) → createInventoryGrid(250,250) → zoomToLayer
+- Qualité eau : loadHubEauStations({station_type:"quality", department:"31"}) → applyParcelStylePreset → zoomToLayer
+- Biodiversité espèce : loadGbifOccurrences({scientificName:"Bufo bufo", country:"FR"}) → setLayerLabels → zoomToLayer
+- Marché immobilier : loadDvfTransactions({commune:"Toulouse", mutationType:"Vente"}) → setLayerLabels → zoomToLayer
+- Détection objets satellite : addRasterFile(ortho.tif) → segmentRasterWithSAM({mode:"text_prompt", textPrompt:"trees"}) → applyParcelStylePreset
+- Prévision météo : forecastWeatherWithEarth2({outputDir, leadHours:48, variables:["t2m","msl"]}) → addRasterFile auto → zoomToLayer
 
 ## PyQGIS (quand aucun outil bridge ne suffit)
 - UN SEUL bloc \`\`\`python\`\`\` complet et exécutable

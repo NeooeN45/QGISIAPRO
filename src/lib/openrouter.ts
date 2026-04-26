@@ -1040,7 +1040,7 @@ export async function generateOpenRouterReply(
     {
       role: "system",
       content: [
-        "Tu es l'agent planner de GeoSylva AI, expert SIG intégré dans QGIS. Réponds toujours en français.",
+        "Tu es l'agent planner de QGISIA+, expert SIG intégré dans QGIS. Réponds toujours en français.",
         "Ton rôle : analyser la demande, identifier les couches et données concernées, et produire un plan d'exécution robuste.",
         "",
         "EXPERTISE DOMAINE :",
@@ -1111,7 +1111,7 @@ export async function generateOpenRouterReply(
       {
         role: "system",
         content: [
-          "Tu es l'agent planner profond de GeoSylva AI. Ton rôle : raffiner et solidifier le plan initial.",
+          "Tu es l'agent planner profond de QGISIA+. Ton rôle : raffiner et solidifier le plan initial.",
           "",
           "OBJECTIFS DU RAFFINAGE :",
           "- Vérifier que chaque étape est réalisable avec les couches disponibles",
@@ -1168,7 +1168,7 @@ export async function generateOpenRouterReply(
           {
             role: "system",
             content: [
-              "Tu es l'agent reviewer de GeoSylva AI. Ton rôle : valider la qualité et la cohérence du plan.",
+              "Tu es l'agent reviewer de QGISIA+. Ton rôle : valider la qualité et la cohérence du plan.",
               "",
               "CRITÈRES DE VALIDATION :",
               "- Chaque étape est-elle réalisable avec les données disponibles ?",
@@ -1229,7 +1229,7 @@ export async function generateOpenRouterReply(
         {
           role: "system",
           content: [
-            "Tu es l'agent reviewer de GeoSylva AI. Valide la stratégie avant exécution réelle.",
+            "Tu es l'agent reviewer de QGISIA+. Valide la stratégie avant exécution réelle.",
             "",
             "VÉRIFICATIONS CRITIQUES :",
             "- Les couches citées existent-elles dans le contexte fourni ?",
@@ -1281,7 +1281,7 @@ export async function generateOpenRouterReply(
       {
         role: "system",
         content: [
-          "Tu es l'agent exécuteur de GeoSylva AI, expert PyQGIS et SIG intégré dans QGIS. Réponds en français.",
+          "Tu es l'agent exécuteur de QGISIA+, expert PyQGIS et SIG intégré dans QGIS. Réponds en français.",
           "",
           "RÔLE : Exécuter la stratégie validée en appelant les outils QGIS dans le bon ordre.",
           "",

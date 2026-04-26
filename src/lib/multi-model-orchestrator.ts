@@ -483,12 +483,17 @@ async function generateWithOllama(
 function buildCodeGenerationPrompt(userMessage: string, analysis: IntentAnalysis): string {
   return `Tu es un expert PyQGIS. Génère UN SEUL bloc de code Python complet pour QGIS.
 
-RÈGLES:
-1. Un seul bloc \`\`\`python ... \`\`\`
+RÈGLES ABSOLUES (OBLIGATOIRES - non respect = crash QGIS):
+1. UN SEUL bloc \`\`\`python ... \`\`\`
 2. Code auto-suffisant avec tous les imports
 3. Gestion des erreurs avec try/except
 4. Message de confirmation à la fin avec iface.messageBar()
 5. Commentaires pour les étapes clés
+6. ⛔ INTERDIT: exit(), quit(), sys.exit(), os._exit() - CES FONCTIONS TUENT QGIS !
+7. ⛔ INTERDIT: N'invente PAS de fonctions (searchGeoApiCommunes, searchCadastreParcels, etc.)
+8. ✅ UTILISE UNIQUEMENT: QgsProject, QgsVectorLayer, QgsRasterLayer, processing.run, iface.messageBar()
+9. Pour les erreurs: try/except + iface.messageBar().pushWarning() - JAMAIS exit() !
+10. Pour les reprojections: utilise processing.run("native:reprojectlayer", ...)
 
 DEMANDE: ${userMessage}
 
@@ -538,12 +543,15 @@ Contexte forestier détecté:
 
 Génère un script PyQGIS complet pour réaliser cet inventaire forestier.
 
-RÈGLES SPÉCIFIQUES:
+RÈGLES ABSOLUES (OBLIGATOIRES - non respect = crash QGIS):
 1. Utilise les algorithmes de grille (creategrid) pour les placettes
 2. Calcule les métriques forestières (surface terrière, densité)
 3. Gère les projections en Lambert 93 (EPSG:2154)
 4. Ajoute des commentaires sur les méthodes forestières utilisées
 5. Message de confirmation final avec les statistiques
+6. ⛔ INTERDIT: exit(), quit(), sys.exit(), os._exit() - CES FONCTIONS TUENT QGIS !
+7. ⛔ INTERDIT: N'invente PAS de fonctions inexistantes
+8. Pour les erreurs: try/except + iface.messageBar().pushWarning() - JAMAIS exit() !
 
 Génère le code:`;
 

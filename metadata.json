@@ -1,6 +1,6 @@
 {
-  "name": "GeoSylva AI",
-  "description": "Un assistant SIG intelligent pour QGIS, capable d'orchestrer des services officiels, des traitements raster et des workflows PyQGIS guidés.",
+  "name": "QGISIA+",
+  "description": "QGISIA+ — Assistant SIG intelligent pour QGIS. Agent hybride BYOK avec 30+ connecteurs FR, RAG PyQGIS, export PDF/Word et MCP Server.",
   "requestFramePermissions": [
     "geolocation"
   ]

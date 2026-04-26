@@ -1,0 +1,266 @@
+{
+  "a529916b-092": {
+    "doc_id": "a529916b-092",
+    "content": "Couche QGIS: peuplements_2024\nType: vecteur\nCRS: EPSG:2154\nEntités: 1234\nEmprise: xmin=500000, ymin=6700000, xmax=700000, ymax=6900000\nChamps: id (entier), essence (texte), surface_ha (réel), annee_plantation (entier)\nGéométrie: Polygone",
+    "metadata": {
+      "title": "Couche: peuplements_2024",
+      "layer_name": "peuplements_2024",
+      "layer_type": "vecteur",
+      "crs": "EPSG:2154",
+      "feature_count": 1234
+    },
+    "collection": "project_layers",
+    "created_at": 1777208328.8879592,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "a7f95efe-814": {
+    "doc_id": "a7f95efe-814",
+    "content": "Couche QGIS: routes_departementales\nType: vecteur\nCRS: EPSG:2154\nEntités: 890\nChamps: nom_route (texte), largeur_m (réel)\nGéométrie: Ligne",
+    "metadata": {
+      "title": "Couche: routes_departementales",
+      "layer_name": "routes_departementales",
+      "layer_type": "vecteur",
+      "crs": "EPSG:2154",
+      "feature_count": 890
+    },
+    "collection": "project_layers",
+    "created_at": 1777208328.8896105,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "dde9a88e-124": {
+    "doc_id": "dde9a88e-124",
+    "content": "La couche 'peuplements_2024' contient les données ONF actualisées pour la zone Bretagne.",
+    "metadata": {
+      "title": "Note ONF Bretagne",
+      "tags": [
+        "onf",
+        "bretagne",
+        "forêt"
+      ]
+    },
+    "collection": "user_notes",
+    "created_at": 1777208328.8923712,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "302eb30e-dfe": {
+    "doc_id": "302eb30e-dfe",
+    "content": "Accéder aux couches dans QGIS avec PyQGIS :\n\n# Toutes les couches\nlayers = QgsProject.instance().mapLayers()\n\n# Couche par nom\nlayer = QgsProject.instance().mapLayersByName(\"nom_couche\")[0]\n\n# Couche active dans l'interface\nlayer = iface.activeLayer()\n\n# Itérer sur les entités\nfor feature in layer.getFeatures():\n    geom = feature.geometry()\n    attrs = feature.attributes()\n    print(feature[\"champ_nom\"])",
+    "metadata": {
+      "title": "Accéder aux couches du projet",
+      "tags": [
+        "couches",
+        "projet",
+        "QgsProject",
+        "layer"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9484408,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "562e2c38-3d2": {
+    "doc_id": "562e2c38-3d2",
+    "content": "Reprojection d'une couche en Lambert 93 (EPSG:2154) — standard France :\n\nfrom qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject\n\n# Définir le CRS cible\ncrs_lambert = QgsCoordinateReferenceSystem(\"EPSG:2154\")\n\n# Reprojeter via processing\nimport processing\nresult = processing.run(\"native:reprojectlayer\", {\n    'INPUT': layer,\n    'TARGET_CRS': QgsCoordinateReferenceSystem('EPSG:2154'),\n    'OUTPUT': 'memory:'\n})\nreprojected = result['OUTPUT']\n\n# Vérifier le CRS d'une couche\nprint(layer.crs().authid())  # ex: EPSG:4326",
+    "metadata": {
+      "title": "Reprojection et CRS Lambert 93",
+      "tags": [
+        "crs",
+        "reprojection",
+        "lambert93",
+        "EPSG:2154",
+        "france"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9500973,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "0b05d081-485": {
+    "doc_id": "0b05d081-485",
+    "content": "Créer une zone tampon (buffer) avec PyQGIS :\n\nimport processing\n\n# Buffer simple en mètres (couche projetée)\nresult = processing.run(\"native:buffer\", {\n    'INPUT': layer,\n    'DISTANCE': 100,        # 100 mètres\n    'SEGMENTS': 5,\n    'END_CAP_STYLE': 0,\n    'JOIN_STYLE': 0,\n    'MITER_LIMIT': 2,\n    'DISSOLVE': False,\n    'OUTPUT': 'memory:'\n})\nbuffer_layer = result['OUTPUT']\nQgsProject.instance().addMapLayer(buffer_layer)\niface.messageBar().pushMessage(\"Buffer\", \"Zone tampon créée\", level=0)",
+    "metadata": {
+      "title": "Buffer / Zone tampon",
+      "tags": [
+        "buffer",
+        "zone tampon",
+        "processing",
+        "analyse spatiale"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9521844,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "38fde199-c2e": {
+    "doc_id": "38fde199-c2e",
+    "content": "Intersection de deux couches vecteur :\n\nimport processing\n\nresult = processing.run(\"native:intersection\", {\n    'INPUT': layer1,\n    'OVERLAY': layer2,\n    'INPUT_FIELDS': [],\n    'OVERLAY_FIELDS': [],\n    'OUTPUT': 'memory:'\n})\nintersection = result['OUTPUT']\n\n# Jointure spatiale (spatial join)\nresult_join = processing.run(\"native:joinattributesbylocation\", {\n    'INPUT': layer_points,\n    'JOIN': layer_polygons,\n    'PREDICATE': [0],  # 0=intersects\n    'JOIN_FIELDS': [],\n    'METHOD': 0,\n    'DISCARD_NONMATCHING': False,\n    'OUTPUT': 'memory:'\n})",
+    "metadata": {
+      "title": "Intersection et jointure spatiale",
+      "tags": [
+        "intersection",
+        "jointure",
+        "jointure spatiale",
+        "overlay"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9538043,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "ed50d68c-139": {
+    "doc_id": "ed50d68c-139",
+    "content": "Calculer des statistiques zonales (valeur raster dans des polygones) :\n\nimport processing\n\nresult = processing.run(\"native:zonalstatisticsfb\", {\n    'INPUT': vector_layer,       # couche polygones\n    'INPUT_RASTER': raster_layer,\n    'RASTER_BAND': 1,\n    'COLUMN_PREFIX': 'stat_',\n    'STATISTICS': [0, 1, 2, 3, 4, 5, 6],  # count, sum, mean, min, max, std, median\n    'OUTPUT': 'memory:'\n})\nstats_layer = result['OUTPUT']\n\n# Accéder aux valeurs\nfor f in stats_layer.getFeatures():\n    print(f[\"stat_mean\"], f[\"stat_sum\"])",
+    "metadata": {
+      "title": "Statistiques zonales raster",
+      "tags": [
+        "statistiques",
+        "zonales",
+        "raster",
+        "zonal stats",
+        "mean",
+        "sum"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9549098,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "56f19eb0-595": {
+    "doc_id": "56f19eb0-595",
+    "content": "Exporter une couche vecteur en différents formats :\n\nfrom qgis.core import QgsVectorFileWriter, QgsCoordinateTransformContext\n\n# Export GeoPackage\nQgsVectorFileWriter.writeAsVectorFormatV3(\n    layer,\n    \"/chemin/sortie.gpkg\",\n    QgsCoordinateTransformContext(),\n    QgsVectorFileWriter.SaveVectorOptions()\n)\n\n# Via processing (plus simple)\nimport processing\nprocessing.run(\"native:savefeatures\", {\n    'INPUT': layer,\n    'OUTPUT': '/chemin/sortie.geojson'\n})\n\niface.messageBar().pushMessage(\"Export\", \"Couche exportée avec succès\", level=0)",
+    "metadata": {
+      "title": "Export couche vecteur",
+      "tags": [
+        "export",
+        "GeoPackage",
+        "GeoJSON",
+        "Shapefile",
+        "sauvegarde"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.957214,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "518c32ab-e6a": {
+    "doc_id": "518c32ab-e6a",
+    "content": "Sélectionner et filtrer des entités dans une couche :\n\n# Par expression\nlayer.selectByExpression('\"surface_ha\" > 10 AND \"type\" = 'forêt'')\nselected = layer.selectedFeatures()\n\n# Itérer avec filtre\nrequest = QgsFeatureRequest()\nrequest.setFilterExpression('\"commune\" = 'Lyon'')\nfor feature in layer.getFeatures(request):\n    print(feature[\"nom\"])\n\n# Sélection par rectangle (extent)\nrect = QgsRectangle(xmin, ymin, xmax, ymax)\nrequest = QgsFeatureRequest().setFilterRect(rect)\n\n# Compter les entités sélectionnées\nprint(f\"Sélection: {layer.selectedFeatureCount()} entités\")",
+    "metadata": {
+      "title": "Sélection et filtrage d'entités",
+      "tags": [
+        "sélection",
+        "filtre",
+        "expression",
+        "QgsFeatureRequest",
+        "attribut"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.958244,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "852a8d42-e2c": {
+    "doc_id": "852a8d42-e2c",
+    "content": "Créer une nouvelle couche vecteur en mémoire ou sur disque :\n\nfrom qgis.core import QgsVectorLayer, QgsField, QgsFeature, QgsGeometry, QgsPointXY\nfrom PyQt5.QtCore import QVariant\n\n# Couche mémoire\nlayer = QgsVectorLayer(\"Point?crs=EPSG:2154\", \"nouvelle_couche\", \"memory\")\nprovider = layer.dataProvider()\n\n# Ajouter des champs\nprovider.addAttributes([\n    QgsField(\"id\", QVariant.Int),\n    QgsField(\"nom\", QVariant.String),\n    QgsField(\"surface\", QVariant.Double),\n])\nlayer.updateFields()\n\n# Ajouter une entité\nfeature = QgsFeature()\nfeature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(2.3522, 48.8566)))\nfeature.setAttributes([1, \"Paris\", 0.0])\nprovider.addFeatures([feature])\n\nQgsProject.instance().addMapLayer(layer)",
+    "metadata": {
+      "title": "Créer une nouvelle couche vecteur",
+      "tags": [
+        "créer",
+        "couche",
+        "mémoire",
+        "QgsVectorLayer",
+        "QgsFeature"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9592254,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "f6ed315b-3c2": {
+    "doc_id": "f6ed315b-3c2",
+    "content": "Calculer surfaces et périmètres en Python PyQGIS :\n\nfrom qgis.core import QgsDistanceArea, QgsProject\n\nda = QgsDistanceArea()\nda.setSourceCrs(layer.crs(), QgsProject.instance().transformContext())\nda.setEllipsoid(QgsProject.instance().ellipsoid())\n\nfor feature in layer.getFeatures():\n    geom = feature.geometry()\n    area_m2 = da.measureArea(geom)\n    area_ha = area_m2 / 10000\n    perim_m = da.measurePerimeter(geom)\n    print(f\"Surface: {area_ha:.2f} ha, Périmètre: {perim_m:.0f} m\")\n\n# Via calculatrice de champ\nlayer.startEditing()\nlayer.addExpressionField('$area / 10000', QgsField('surface_ha', QVariant.Double))\nlayer.commitChanges()",
+    "metadata": {
+      "title": "Calculer la surface et le périmètre",
+      "tags": [
+        "surface",
+        "périmètre",
+        "area",
+        "hectares",
+        "mesure",
+        "QgsDistanceArea"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.960835,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "e8f6acd8-8f2": {
+    "doc_id": "e8f6acd8-8f2",
+    "content": "Charger des données depuis les services web IGN (Géoportail) :\n\n# WMS IGN - Orthophotos\nwms_uri = \"crs=EPSG:2154&format=image/png&layers=ORTHOIMAGERY.ORTHOPHOTOS&styles=&url=https://wxs.ign.fr/essentiels/geoportail/r/wms\"\nraster = QgsRasterLayer(wms_uri, \"Ortho IGN\", \"wms\")\nQgsProject.instance().addMapLayer(raster)\n\n# WFS IGN - Bâtiments BD TOPO\nwfs_uri = \"pagingEnabled='true' preferCoordinatesForWfsT11='false' srsname='EPSG:2154' typename='BDTOPO_V3:batiment' url='https://wxs.ign.fr/essentiels/geoportail/wfs' version='2.0.0'\"\nwfs_layer = QgsVectorLayer(wfs_uri, \"Bâtiments IGN\", \"WFS\")\nQgsProject.instance().addMapLayer(wfs_layer)\n\n# API Cadastre (cadastre.gouv.fr)\nimport requests\nr = requests.get(\"https://geocodage.ign.fr/look4/parcel/search?q=44109000BH0012\")\nprint(r.json())",
+    "metadata": {
+      "title": "Chargement données WFS / WMS IGN",
+      "tags": [
+        "WMS",
+        "WFS",
+        "IGN",
+        "Géoportail",
+        "orthophoto",
+        "cadastre",
+        "BDTOPO"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.963499,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "9e8a501e-ceb": {
+    "doc_id": "9e8a501e-ceb",
+    "content": "Analyse de réseau routier avec PyQGIS :\n\nimport processing\n\n# Distance sur réseau (QNEAT3)\nresult = processing.run(\"qneat3:distancematrix\", {\n    'INPUT': network_layer,\n    'STRATEGY': 0,   # distance la plus courte\n    'FROM_POINT': start_point,\n    'TO_POINTS': destinations_layer,\n    'OUTPUT': 'memory:'\n})\n\n# Zone isochrone\nresult = processing.run(\"qneat3:isoareas\", {\n    'INPUT': network_layer,\n    'START_POINTS': origin_layer,\n    'MAX_DIST': 5000,   # 5 km\n    'STRATEGY': 0,\n    'OUTPUT': 'memory:'\n})",
+    "metadata": {
+      "title": "Analyse de réseau et itinéraires",
+      "tags": [
+        "réseau",
+        "itinéraire",
+        "isochrone",
+        "QNEAT3",
+        "distance"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9648106,
+    "chunk_index": 0,
+    "source_url": null
+  },
+  "5a549ca8-0a0": {
+    "doc_id": "5a549ca8-0a0",
+    "content": "Fusionner et dissoudre des couches vecteur :\n\nimport processing\n\n# Dissoudre par attribut\nresult = processing.run(\"native:dissolve\", {\n    'INPUT': layer,\n    'FIELD': ['commune'],   # dissoudre par commune\n    'OUTPUT': 'memory:'\n})\n\n# Fusionner plusieurs couches\nresult = processing.run(\"native:mergevectorlayers\", {\n    'LAYERS': [layer1, layer2, layer3],\n    'CRS': QgsCoordinateReferenceSystem('EPSG:2154'),\n    'OUTPUT': 'memory:'\n})\n\n# Clip - découper par un masque\nresult = processing.run(\"native:clip\", {\n    'INPUT': layer_a_decouper,\n    'OVERLAY': masque,\n    'OUTPUT': 'memory:'\n})",
+    "metadata": {
+      "title": "Fusion et dissolution de couches",
+      "tags": [
+        "fusionner",
+        "dissoudre",
+        "clip",
+        "découper",
+        "merge",
+        "dissolve"
+      ]
+    },
+    "collection": "pyqgis_docs",
+    "created_at": 1777208328.9657445,
+    "chunk_index": 0,
+    "source_url": null
+  }
+}

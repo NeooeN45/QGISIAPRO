@@ -1266,6 +1266,161 @@ class QgisBridge(BridgeQObject):
         self._notify(message, Qgis.Success)
         return message
 
+    @BridgeSlot(str, result=str)
+    def exportProjectReport(self, options_json):
+        """
+        Exporte un rapport PDF ou DOCX du projet QGIS courant.
+
+        options_json : JSON serialise avec title, format ('pdf'|'docx'),
+        outputPath, author, subtitle, includeLayers, includeMap, sections.
+        """
+        try:
+            opts = json.loads(options_json) if options_json else {}
+        except json.JSONDecodeError:
+            message = "Options export rapport invalides (JSON malforme)."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        title = str(opts.get("title") or "").strip()
+        if not title:
+            message = "Le titre du rapport est requis."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        output_path = str(opts.get("outputPath") or "").strip()
+        if not output_path:
+            message = "outputPath est requis."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        fmt = str(opts.get("format") or "pdf").lower().strip()
+        if fmt not in ("pdf", "docx"):
+            message = f"Format non supporte : {fmt}. Choisis 'pdf' ou 'docx'."
+            self._notify(message, Qgis.Warning)
+            return message
+
+        try:
+            from .report_export import (
+                LayerInfo,
+                ReportConfig,
+                ReportSection,
+                ReportExportError,
+                export_report,
+            )
+        except ImportError as e:
+            message = f"Module report_export indisponible : {e}"
+            self._notify(message, Qgis.Critical)
+            return message
+
+        # Collecte des couches du projet
+        layers_info: list = []
+        if opts.get("includeLayers", True):
+            for layer in QgsProject.instance().mapLayers().values():
+                try:
+                    if isinstance(layer, QgsVectorLayer):
+                        layers_info.append(LayerInfo(
+                            name=layer.name(),
+                            type="vector",
+                            crs=layer.crs().authid(),
+                            feature_count=layer.featureCount(),
+                            geometry_type=str(layer.geometryType()),
+                        ))
+                    elif isinstance(layer, QgsRasterLayer):
+                        layers_info.append(LayerInfo(
+                            name=layer.name(),
+                            type="raster",
+                            crs=layer.crs().authid(),
+                        ))
+                except Exception:  # noqa: BLE001
+                    continue
+
+        # Snapshot carte (optionnel)
+        map_image = None
+        if opts.get("includeMap", True):
+            try:
+                map_image = self._capture_map_snapshot()
+            except Exception as e:  # noqa: BLE001
+                QgsMessageLog.logMessage(
+                    f"Snapshot carte echouee : {e}", "QGISIA+", Qgis.Warning,
+                )
+
+        # Sections custom
+        sections = []
+        for sec in (opts.get("sections") or []):
+            sections.append(ReportSection(
+                title=str(sec.get("title", "Section")),
+                body=str(sec.get("body", "")),
+                bullets=[str(b) for b in (sec.get("bullets") or [])],
+                table_headers=[str(h) for h in (sec.get("tableHeaders") or [])],
+                table_rows=[[str(c) for c in row] for row in (sec.get("tableRows") or [])],
+            ))
+
+        config = ReportConfig(
+            title=title,
+            subtitle=str(opts.get("subtitle") or ""),
+            author=str(opts.get("author") or ""),
+            map_image=map_image,
+            layers=layers_info,
+            sections=sections,
+        )
+
+        try:
+            result = export_report(config, output_path, format=fmt)
+        except ReportExportError as e:
+            message = (
+                f"Export {fmt.upper()} indisponible : {e}. "
+                f"Installe via 'pip install {'reportlab' if fmt == 'pdf' else 'python-docx'} Pillow'."
+            )
+            self._notify(message, Qgis.Critical)
+            return message
+        except ValueError as e:
+            message = f"Parametres rapport invalides : {e}"
+            self._notify(message, Qgis.Warning)
+            return message
+        except Exception as e:  # noqa: BLE001
+            message = f"Echec export rapport : {e}"
+            self._notify(message, Qgis.Critical)
+            return message
+
+        message = (
+            f"Rapport {fmt.upper()} genere : {Path(result.output_path).name} "
+            f"({len(layers_info)} couches, {result.duration_s:.1f}s)."
+        )
+        self._notify(message, Qgis.Success)
+        return message
+
+    def _capture_map_snapshot(self):
+        """Capture l'etendue de la carte courante en PNG temporaire."""
+        try:
+            from qgis.utils import iface
+            from qgis.core import QgsMapSettings
+            from qgis.PyQt.QtCore import QSize
+            from qgis.PyQt.QtGui import QImage, QPainter, QColor
+
+            canvas = iface.mapCanvas()
+            settings = QgsMapSettings()
+            settings.setLayers(canvas.layers())
+            settings.setExtent(canvas.extent())
+            settings.setOutputSize(QSize(1600, 1000))
+            settings.setDestinationCrs(canvas.mapSettings().destinationCrs())
+            settings.setBackgroundColor(QColor(255, 255, 255))
+
+            from qgis.core import QgsMapRendererCustomPainterJob
+            img = QImage(settings.outputSize(), QImage.Format_ARGB32_Premultiplied)
+            img.fill(QColor(255, 255, 255).rgb())
+            painter = QPainter(img)
+            job = QgsMapRendererCustomPainterJob(settings, painter)
+            job.start()
+            job.waitForFinished()
+            painter.end()
+
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.close()
+            img.save(tmp.name, "PNG")
+            return tmp.name
+        except Exception:  # noqa: BLE001
+            return None
+
     @BridgeSlot(str, str, result=str)
     def applyParcelStylePreset(self, layer_ref, preset_id):
         layer = self._find_layer(layer_ref)
@@ -2211,6 +2366,11 @@ class ThreadedAssetServer:
             elif route == "/api/qgis/forecastWeatherWithEarth2":
                 result = self._bridge_call(
                     "forecastWeatherWithEarth2",
+                    body.get("options", ""),
+                )
+            elif route == "/api/qgis/exportProjectReport":
+                result = self._bridge_call(
+                    "exportProjectReport",
                     body.get("options", ""),
                 )
             elif route == "/api/qgis/calculateRasterFormula":

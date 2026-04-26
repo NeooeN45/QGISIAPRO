@@ -175,6 +175,10 @@ interface RawQgisBridge {
     optionsJson: string,
     callback?: QgisCallback<string>,
   ) => string | void;
+  exportProjectReport?: (
+    optionsJson: string,
+    callback?: QgisCallback<string>,
+  ) => string | void;
   calculateRasterFormula?: (
     layerIdsJson: string,
     formula: string,
@@ -451,6 +455,15 @@ function getHttpBridge(): RawQgisBridge | undefined {
     },
     forecastWeatherWithEarth2: (optionsJson, callback) => {
       void postJson<string>("/api/qgis/forecastWeatherWithEarth2", {
+        options: optionsJson,
+      }).then((result) => {
+        if (callback) {
+          callback(typeof result === "string" ? result : "");
+        }
+      });
+    },
+    exportProjectReport: (optionsJson, callback) => {
+      void postJson<string>("/api/qgis/exportProjectReport", {
         options: optionsJson,
       }).then((result) => {
         if (callback) {
@@ -1349,6 +1362,49 @@ export interface Earth2ForecastOptions {
   variables?: string[];
   /** Préfixe des couches QGIS (défaut "Earth2") */
   layerPrefix?: string;
+}
+
+export interface ReportSectionInput {
+  title: string;
+  body?: string;
+  bullets?: string[];
+  tableHeaders?: string[];
+  tableRows?: string[][];
+}
+
+export interface ReportExportOptions {
+  /** Titre du rapport (obligatoire) */
+  title: string;
+  /** Chemin de sortie (.pdf ou .docx) */
+  outputPath: string;
+  /** Format : pdf (defaut) ou docx */
+  format?: "pdf" | "docx";
+  /** Auteur (optionnel) */
+  author?: string;
+  /** Sous-titre */
+  subtitle?: string;
+  /** Inclure le tableau des couches du projet (defaut true) */
+  includeLayers?: boolean;
+  /** Inclure un snapshot de la carte (defaut true) */
+  includeMap?: boolean;
+  /** Sections personnalisees */
+  sections?: ReportSectionInput[];
+}
+
+export async function exportProjectReport(
+  options: ReportExportOptions,
+): Promise<string | null> {
+  const bridge = getBridge();
+  if (!bridge?.exportProjectReport) {
+    return null;
+  }
+  const result = await callQgisWithResult<string>(
+    (callback) =>
+      bridge.exportProjectReport?.(JSON.stringify(options), callback),
+    "",
+    QGIS_SCRIPT_TIMEOUT_MS,
+  );
+  return typeof result === "string" && result.length > 0 ? result : null;
 }
 
 export async function forecastWeatherWithEarth2(

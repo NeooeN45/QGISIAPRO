@@ -23,9 +23,11 @@ import {
   Trash2,
   Workflow,
   X,
+  Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
 import OllamaSetupWizard from "./OllamaSetupWizard";
+import { GatewaySettingsPanel } from "./GatewaySettingsPanel";
 import { toast } from "sonner";
 
 import { cn } from "@/src/lib/utils";
@@ -242,7 +244,7 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
-  const [activeTab, setActiveTab] = useState<"provider" | "config" | "execution" | "diagnostics">("provider");
+  const [activeTab, setActiveTab] = useState<"provider" | "gateway" | "config" | "execution" | "diagnostics">("provider");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const defaults = new Set<string>(["provider"]);
     const p = localSettings.provider;
@@ -890,6 +892,7 @@ export default function SettingsModal({
     <nav className="flex w-52 flex-col gap-1 border-r border-white/[0.06] bg-[#131314] p-3">
       {[
         { id: "provider" as const, label: "Provider", icon: Cpu, description: "Choisir le fournisseur IA" },
+        { id: "gateway" as const, label: "Gateway IA", icon: Zap, description: "BYOK multi-providers unifié" },
         { id: "config" as const, label: "Configuration", icon: SettingsIcon, description: "Stack et modèles" },
         { id: "execution" as const, label: "Exécution", icon: Workflow, description: "Options d'exécution" },
         { id: "diagnostics" as const, label: "Diagnostics", icon: FlaskConical, description: "Logs et tests" },
@@ -1705,6 +1708,11 @@ export default function SettingsModal({
                 </div>,
                 "purple"
               )}
+            </div>
+          )}
+          {activeTab === "gateway" && (
+            <div className="space-y-4">
+              <GatewaySettingsPanel />
             </div>
           )}
           {activeTab === "config" && (
