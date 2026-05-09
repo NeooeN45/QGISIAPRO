@@ -2622,6 +2622,10 @@ class ThreadedAssetServer:
                 return True
 
             if route == "/api/llm/install":
+                # Verifier si deja installe
+                if llm_installer.is_vendor_ready():
+                    self._send_json(handler, 200, {"ok": True, "status": "ready", "already_installed": True})
+                    return True
                 # Lance l'install vendor en tache de fond avec log immédiat
                 llm_installer._log("api", "Endpoint /api/llm/install appelé - démarrage thread")
                 thread = llm_installer.install_async()

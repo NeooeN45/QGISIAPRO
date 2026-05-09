@@ -8,6 +8,7 @@ import {
   chat as gwChat,
   streamChat as gwStreamChat,
   streamToText as gwStreamToText,
+  streamToTextResilient as gwStreamToTextResilient,
   listModels as gwListModels,
   getBudget as gwGetBudget,
   health as gwHealth,
@@ -23,6 +24,7 @@ import {
   type InstallStatus,
   type InstallLog,
   type DiagnosticInfo,
+  type StreamResult,
 } from "../lib/litellm-client";
 import { useGatewayStore } from "../stores/useGatewayStore";
 
@@ -40,6 +42,11 @@ export interface UseLLMGatewayResult {
     req: Omit<ChatRequest, "api_keys">,
     onDelta?: (delta: string, full: string) => void,
   ) => Promise<string>;
+  streamToTextResilient: (
+    req: Omit<ChatRequest, "api_keys">,
+    onDelta?: (delta: string, full: string) => void,
+    onRetry?: (attempt: number, error: string) => void,
+  ) => Promise<StreamResult>;
   listModels: () => Promise<ModelAlias[]>;
   getBudget: () => Promise<BudgetSnapshot>;
   installGateway: () => Promise<void>;
@@ -102,6 +109,11 @@ export function useLLMGateway(): UseLLMGatewayResult {
     [getApiKeys],
   );
 
+  const streamToTextResilient = useCallback<UseLLMGatewayResult["streamToTextResilient"]>(
+    (req, onDelta, onRetry) => gwStreamToTextResilient({ ...req, api_keys: getApiKeys() }, onDelta, onRetry),
+    [getApiKeys],
+  );
+
   const listModels = useCallback(() => gwListModels(), []);
   const getBudget = useCallback(() => gwGetBudget(), []);
 
@@ -116,7 +128,13 @@ export function useLLMGateway(): UseLLMGatewayResult {
     }
     
     try {
-      await gwInstall();
+      const result = await gwInstall();
+      
+      // Si deja installe, mettre immediatement a ready
+      if (result.already_installed || result.status === "ready") {
+        setStatus("ready");
+        return;
+      }
       
       // Poll détaillé toutes les 2s pendant 3 min max
       const deadline = Date.now() + 180_000;
@@ -203,6 +221,7 @@ export function useLLMGateway(): UseLLMGatewayResult {
     chat,
     streamChat,
     streamToText,
+    streamToTextResilient,
     listModels,
     getBudget,
     installGateway,

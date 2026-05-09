@@ -167,8 +167,8 @@ export async function health(): Promise<HealthStatus> {
   return { vendor_ready: data.vendor_ready, config_loaded: data.config_loaded, aliases: data.aliases };
 }
 
-export async function installGateway(): Promise<void> {
-  await apiFetch<{ ok: boolean; status: string }>("/api/llm/install", { method: "POST" });
+export async function installGateway(): Promise<{ ok: boolean; status: string; already_installed?: boolean }> {
+  return apiFetch<{ ok: boolean; status: string; already_installed?: boolean }>("/api/llm/install", { method: "POST" });
 }
 
 export async function getInstallStatus(): Promise<InstallStatus> {
@@ -228,68 +228,309 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
 }
 
 /**
- * Streaming SSE. Yield de chunks au format OpenAI delta.
- * Respecte AbortSignal.
+ * Configuration du streaming robuste.
+ */
+const STREAM_CONFIG = {
+  FETCH_TIMEOUT_MS: 60000,        // Timeout initial de connexion: 60s (models lents)
+  CHUNK_TIMEOUT_MS: 120000,       // Timeout entre chunks: 120s (generation longue)
+  MAX_RETRIES: 3,                 // Nombre de retries: 3 (plus tolérant)
+  RETRY_DELAY_MS: 1500,         // Délai initial entre retries: 1.5s
+  MAX_RETRY_DELAY_MS: 10000,    // Délai max entre retries: 10s
+};
+
+/**
+ * Crée un AbortController avec timeout.
+ */
+function createTimeoutController(timeoutMs: number): AbortController {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  // Nettoyer le timeout si déjà résolu
+  const cleanup = () => clearTimeout(timeout);
+  controller.signal.addEventListener('abort', cleanup, { once: true });
+  return controller;
+}
+
+/**
+ * Attend avec backoff exponentiel.
+ */
+async function sleepWithBackoff(attempt: number): Promise<void> {
+  const delay = Math.min(
+    STREAM_CONFIG.RETRY_DELAY_MS * Math.pow(2, attempt),
+    STREAM_CONFIG.MAX_RETRY_DELAY_MS
+  );
+  await new Promise(r => setTimeout(r, delay));
+}
+
+/**
+ * Streaming SSE robuste avec retry, timeout et gestion d'erreurs.
+ * Yield de chunks au format OpenAI delta.
  */
 export async function* streamChat(req: ChatRequest): AsyncGenerator<ChatChunk, void, void> {
-  const { signal, ...body } = req;
-  const response = await fetch(`${getBaseUrl()}/api/llm/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({ ...body, stream: true }),
-    signal,
-  });
+  const { signal: userSignal, ...body } = req;
+  let lastError: Error | null = null;
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Stream error ${response.status}`);
-  }
+  for (let attempt = 0; attempt <= STREAM_CONFIG.MAX_RETRIES; attempt++) {
+    try {
+      // Timeout controller pour la connexion initiale
+      const timeoutController = createTimeoutController(STREAM_CONFIG.FETCH_TIMEOUT_MS);
+      
+      // Combiner les signaux si l'utilisateur en a fourni un
+      const combinedSignal = userSignal 
+        ? AbortSignal.any([userSignal, timeoutController.signal])
+        : timeoutController.signal;
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+      const response = await fetch(`${getBaseUrl()}/api/llm/chat`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+        body: JSON.stringify({ ...body, stream: true }),
+        signal: combinedSignal,
+      });
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === "[DONE]") return;
-        try {
-          const chunk = JSON.parse(payload) as ChatChunk & { error?: string };
-          if (chunk.error) throw new Error(chunk.error);
-          yield chunk;
-        } catch (err) {
-          if (err instanceof Error && err.message) throw err;
-        }
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
+
+      if (!response.body) {
+        throw new Error("Response body is null");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let lastChunkTime = Date.now();
+      let heartbeatMissed = false;
+
+      try {
+        while (true) {
+          // Vérifier le timeout entre chunks
+          if (Date.now() - lastChunkTime > STREAM_CONFIG.CHUNK_TIMEOUT_MS) {
+            throw new Error("Chunk timeout - no data received for 60s");
+          }
+
+          // Vérifier si l'utilisateur a demandé l'annulation
+          if (userSignal?.aborted) {
+            throw new Error("Request aborted by user");
+          }
+
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            // Traiter le buffer restant
+            if (buffer.trim()) {
+              const lines = buffer.split("\n");
+              for (const line of lines) {
+                const chunk = parseSSELine(line);
+                if (chunk) yield chunk;
+              }
+            }
+            return; // Stream terminé normalement
+          }
+
+          lastChunkTime = Date.now();
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const chunk = parseSSELine(line);
+            if (chunk) {
+              heartbeatMissed = false;
+              yield chunk;
+            } else if (line.trim() === "" && !heartbeatMissed) {
+              // Heartbeat SSE (ligne vide)
+              heartbeatMissed = true;
+            }
+          }
+        }
+      } catch (readError) {
+        // Erreur de lecture - tenter un retry si ce n'est pas un abort utilisateur
+        if (userSignal?.aborted) throw readError;
+        
+        lastError = readError instanceof Error ? readError : new Error(String(readError));
+        
+        // Si c'est la dernière tentative, propager l'erreur
+        if (attempt >= STREAM_CONFIG.MAX_RETRIES) {
+          throw lastError;
+        }
+        
+        // Sinon, attendre et retry
+        await sleepWithBackoff(attempt);
+        continue; // Retry
+      } finally {
+        reader.releaseLock();
+      }
+      
+      // Si on arrive ici, le stream s'est terminé normalement
+      return;
+      
+    } catch (fetchError) {
+      // Erreur de fetch (réseau, timeout, etc.)
+      if (userSignal?.aborted) throw fetchError;
+      
+      lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
+      
+      // Si c'est la dernière tentative, propager l'erreur
+      if (attempt >= STREAM_CONFIG.MAX_RETRIES) {
+        throw lastError;
+      }
+      
+      // Sinon, attendre et retry
+      await sleepWithBackoff(attempt);
     }
-  } finally {
-    reader.releaseLock();
+  }
+  
+  // Si on arrive ici, tous les retries ont échoué
+  throw lastError || new Error("Streaming failed after all retries");
+}
+
+/**
+ * Parse une ligne SSE et retourne le chunk ou null.
+ */
+function parseSSELine(line: string): ChatChunk | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data:")) return null;
+  
+  const payload = trimmed.slice(5).trim();
+  if (payload === "[DONE]") return null;
+  if (!payload) return null;
+  
+  try {
+    const chunk = JSON.parse(payload) as ChatChunk & { error?: string };
+    
+    // Vérifier si le backend a retourné une erreur dans le chunk
+    if (chunk.error) {
+      throw new Error(`Backend error: ${chunk.error}`);
+    }
+    
+    return chunk;
+  } catch (err) {
+    // Ignorer les lignes qui ne sont pas du JSON valide (logs, heartbeats, etc.)
+    if (err instanceof Error && err.message.startsWith("Backend error:")) {
+      throw err;
+    }
+    return null;
   }
 }
 
 /**
- * Helper : concatene un stream en string complete.
+ * Résultat du streaming avec métadonnées.
+ */
+export interface StreamResult {
+  text: string;
+  done: boolean;
+  error?: string;
+  retryCount: number;
+  durationMs: number;
+}
+
+/**
+ * Helper robuste : concatène un stream en string complète.
+ * Gère les erreurs avec callback onError pour affichage UI.
  */
 export async function streamToText(
   req: ChatRequest,
   onDelta?: (delta: string, full: string) => void,
+  onError?: (error: string, partialText: string) => void,
 ): Promise<string> {
   let full = "";
-  for await (const chunk of streamChat(req)) {
-    const delta = chunk.choices?.[0]?.delta?.content ?? "";
-    if (delta) {
-      full += delta;
-      onDelta?.(delta, full);
+  let retryCount = 0;
+  const startTime = Date.now();
+
+  try {
+    for await (const chunk of streamChat(req)) {
+      const delta = chunk.choices?.[0]?.delta?.content ?? "";
+      if (delta) {
+        full += delta;
+        onDelta?.(delta, full);
+      }
     }
+    return full;
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    
+    // Notifier l'erreur via callback
+    onError?.(error, full);
+    
+    // Log pour debug
+    console.error("[streamToText] Streaming error:", error);
+    
+    // Relancer pour que l'appelant puisse gérer
+    throw err;
   }
-  return full;
+}
+
+/**
+ * Streaming avec résilience maximale : retry automatique, 
+ * détection de déconnexion, et récupération du texte partiel.
+ */
+export async function streamToTextResilient(
+  req: ChatRequest,
+  onDelta?: (delta: string, full: string) => void,
+  onRetry?: (attempt: number, error: string) => void,
+): Promise<StreamResult> {
+  let full = "";
+  let retryCount = 0;
+  const startTime = Date.now();
+  
+  const makeRequest = async (attempt: number): Promise<string> => {
+    try {
+      // Créer un nouveau request avec le contexte accumulé
+      const messages = [...req.messages];
+      
+      // Si on a déjà du texte, ajouter un message système pour continuer
+      if (full && attempt > 0) {
+        messages.push({
+          role: "assistant",
+          content: full,
+        });
+      }
+      
+      const result = await streamToText(
+        { ...req, messages },
+        (delta, current) => {
+          full = current;
+          onDelta?.(delta, current);
+        },
+        undefined // Pas d'onError ici, on gère nous-mêmes
+      );
+      
+      return result;
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      
+      if (attempt < STREAM_CONFIG.MAX_RETRIES) {
+        retryCount++;
+        onRetry?.(attempt + 1, error);
+        await sleepWithBackoff(attempt);
+        return makeRequest(attempt + 1);
+      }
+      
+      throw err;
+    }
+  };
+
+  try {
+    const finalText = await makeRequest(0);
+    return {
+      text: finalText,
+      done: true,
+      retryCount,
+      durationMs: Date.now() - startTime,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return {
+      text: full, // Retourner ce qu'on a pu récupérer
+      done: false,
+      error,
+      retryCount,
+      durationMs: Date.now() - startTime,
+    };
+  }
 }

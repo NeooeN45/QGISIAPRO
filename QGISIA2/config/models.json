@@ -21,35 +21,36 @@
       "temperature": 0.2
     },
     "vision": {
-      "description": "Analyse d'images (cartes, captures, satellite, LiDAR)",
-      "primary": "nvidia_nim/microsoft/phi-3-vision-128k-instruct",
+      "description": "Analyse d'images SIG via NVIDIA (cartes, orthophotos, LiDAR)",
+      "primary": "nvidia_nim/meta/llama-3.2-90b-vision-instruct",
       "fallbacks": [
+        "nvidia_nim/meta/llama-3.2-11b-vision-instruct",
         "gemini/gemini-2.0-flash",
         "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.2
     },
     "vision-premium": {
-      "description": "Analyse fine d'images haute qualite (orthophotos, plans)",
-      "primary": "gemini/gemini-2.5-flash",
+      "description": "Analyse fine d'images via NVIDIA Llama 3.2 Vision",
+      "primary": "nvidia_nim/meta/llama-3.2-90b-vision-instruct",
       "fallbacks": [
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "nvidia_nim/microsoft/phi-3-vision-128k-instruct"
+        "gemini/gemini-2.5-flash",
+        "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.2
     },
     "code-pyqgis": {
-      "description": "Generation de code PyQGIS et GDAL (specialise)",
-      "primary": "openrouter/qwen/qwen-2.5-coder-32b-instruct",
+      "description": "Generation de code PyQGIS via NVIDIA Qwen Coder",
+      "primary": "nvidia_nim/qwen/qwen2.5-coder-32b-instruct",
       "fallbacks": [
-        "nvidia_nim/meta/llama-3.1-70b-instruct",
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "ollama/qwen2.5-coder:7b"
+        "nvidia_nim/mistralai/codestral-22b-instruct-v0.1",
+        "nvidia_nim/deepseek-ai/deepseek-coder-6.7b-instruct",
+        "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.1
     },
     "intent-router": {
-      "description": "Analyse d'intention ultra-rapide (petit modele)",
+      "description": "Analyse d'intention ultra-rapide via NVIDIA Nemotron Mini",
       "primary": "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
       "fallbacks": [
         "groq/llama-3.1-8b-instant",
@@ -58,8 +59,8 @@
       "temperature": 0.0
     },
     "nvidia-reasoning": {
-      "description": "NVIDIA Nemotron 70B reasoning - raisonnement complexe, analyses SIG",
-      "primary": "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+      "description": "Llama 3.1 70B via NVIDIA - raisonnement complexe, analyses SIG",
+      "primary": "nvidia_nim/meta/llama-3.1-70b-instruct",
       "fallbacks": [
         "openrouter/anthropic/claude-3.5-sonnet",
         "groq/llama-3.3-70b-versatile"
@@ -67,7 +68,7 @@
       "temperature": 0.2
     },
     "nvidia-fast": {
-      "description": "NVIDIA Nemotron Mini 4B - tool calling rapide et leger",
+      "description": "NVIDIA Nemotron Mini 4B - rapide et leger",
       "primary": "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
       "fallbacks": [
         "groq/llama-3.1-8b-instant",
@@ -79,8 +80,8 @@
       "description": "Llama 3.1 70B via NVIDIA NIM Developer Program - polyvalent haute qualite",
       "primary": "nvidia_nim/meta/llama-3.1-70b-instruct",
       "fallbacks": [
-        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
-        "groq/llama-3.3-70b-versatile"
+        "groq/llama-3.3-70b-versatile",
+        "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.2
     },
@@ -88,7 +89,7 @@
       "description": "Llama 3.1 405B via NVIDIA NIM - maximum de capacites raisonnement",
       "primary": "nvidia_nim/meta/llama-3.1-405b-instruct",
       "fallbacks": [
-        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
         "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.2
@@ -102,14 +103,86 @@
       ],
       "temperature": 0.2
     },
-    "nvidia-phi": {
-      "description": "Microsoft Phi-3 Medium via NVIDIA NIM - compact et rapide",
-      "primary": "nvidia_nim/microsoft/phi-3-medium-128k-instruct",
+    "nvidia-mistral-large": {
+      "description": "Mistral Large 3 via NVIDIA NIM - modèle de langage avancé",
+      "primary": "nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512",
       "fallbacks": [
-        "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
-        "ollama/qwen3:4b"
+        "nvidia_nim/mistralai/mistral-large-2-instruct",
+        "nvidia_nim/meta/llama-3.1-70b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-codestral": {
+      "description": "Mistral Codestral via NVIDIA NIM - spécialisé code",
+      "primary": "nvidia_nim/mistralai/codestral-22b-instruct-v0.1",
+      "fallbacks": [
+        "nvidia_nim/qwen/qwen2.5-coder-32b-instruct",
+        "nvidia_nim/meta/codellama-70b"
       ],
       "temperature": 0.1
+    },
+    "nvidia-qwen-coder": {
+      "description": "Qwen 2.5 Coder via NVIDIA NIM - génération de code PyQGIS",
+      "primary": "nvidia_nim/qwen/qwen2.5-coder-32b-instruct",
+      "fallbacks": [
+        "nvidia_nim/deepseek-ai/deepseek-coder-6.7b-instruct",
+        "nvidia_nim/ibm/granite-8b-code-instruct"
+      ],
+      "temperature": 0.1
+    },
+    "nvidia-deepseek": {
+      "description": "DeepSeek v4 Pro via NVIDIA NIM - raisonnement avancé",
+      "primary": "nvidia_nim/deepseek-ai/deepseek-v4-pro",
+      "fallbacks": [
+        "nvidia_nim/deepseek-ai/deepseek-v4-flash",
+        "nvidia_nim/meta/llama-3.1-405b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-gemma": {
+      "description": "Google Gemma 3 via NVIDIA NIM - léger et rapide",
+      "primary": "nvidia_nim/google/gemma-3-27b-it",
+      "fallbacks": [
+        "nvidia_nim/google/gemma-3-12b-it",
+        "nvidia_nim/meta/llama-3.1-8b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-nemotron-super": {
+      "description": "NVIDIA Nemotron Super 49B via NIM - raisonnement optimisé",
+      "primary": "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      "fallbacks": [
+        "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1",
+        "nvidia_nim/meta/llama-3.3-70b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-nemotron-ultra": {
+      "description": "NVIDIA Nemotron Ultra 253B via NIM - très haute capacité",
+      "primary": "nvidia_nim/nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "fallbacks": [
+        "nvidia_nim/nvidia/nemotron-4-340b-instruct",
+        "nvidia_nim/meta/llama-3.1-405b-instruct"
+      ],
+      "temperature": 0.2
+    },
+    "nvidia-phi": {
+      "description": "Microsoft Phi-4 via NVIDIA NIM - compact et rapide",
+      "primary": "nvidia_nim/microsoft/phi-4-multimodal-instruct",
+      "fallbacks": [
+        "nvidia_nim/microsoft/phi-4-mini-instruct",
+        "nvidia_nim/microsoft/phi-3.5-moe-instruct"
+      ],
+      "temperature": 0.1
+    },
+    "nvidia-vision-llama": {
+      "description": "Llama 3.2 Vision via NVIDIA NIM - analyse d'images",
+      "primary": "nvidia_nim/meta/llama-3.2-90b-vision-instruct",
+      "fallbacks": [
+        "nvidia_nim/meta/llama-3.2-11b-vision-instruct",
+        "nvidia_nim/microsoft/phi-4-multimodal-instruct"
+      ],
+      "temperature": 0.2
     },
     "fast-cloud": {
       "description": "Groq LPU ultra-rapide (free tier) - ideal chat reactif",
@@ -133,47 +206,207 @@
       "description": "Anthropic Claude en direct (bypass OpenRouter) - pour analyses pro",
       "primary": "anthropic/claude-3-5-sonnet-latest",
       "fallbacks": [
-        "nvidia_nim/nvidia/llama-3.1-nemotron-70b-instruct",
+        "nvidia_nim/meta/llama-3.1-70b-instruct",
         "openrouter/anthropic/claude-3.5-sonnet"
       ],
       "temperature": 0.3
     }
   },
   "nvidia_nim_catalog": {
-    "comment": "Catalogue complet NVIDIA NIM Developer Program — gratuit pour dev/test",
+    "comment": "Catalogue complet NVIDIA NIM - 150+ modèles disponibles",
     "base_url": "https://integrate.api.nvidia.com/v1",
     "models": {
-      "text": [
-        "meta/llama-3.1-8b-instruct",
-        "meta/llama-3.1-70b-instruct",
-        "meta/llama-3.1-405b-instruct",
-        "meta/llama-3.3-70b-instruct",
-        "nvidia/llama-3.1-nemotron-70b-instruct",
-        "nvidia/nemotron-mini-4b-instruct",
-        "mistralai/mixtral-8x22b-instruct-v0.1",
-        "mistralai/mistral-large-2-instruct",
-        "microsoft/phi-3-medium-128k-instruct",
-        "google/gemma-2-27b-it",
-        "qwen/qwen2-72b-instruct"
-      ],
-      "vision": [
-        "microsoft/phi-3-vision-128k-instruct",
-        "nvidia/llava-v1.6-34b",
-        "meta/llama-3.2-11b-vision-instruct",
-        "meta/llama-3.2-90b-vision-instruct"
-      ],
+      "text": {
+        "meta": [
+          "meta/llama-3.1-8b-instruct",
+          "meta/llama-3.1-70b-instruct",
+          "meta/llama-3.1-405b-instruct",
+          "meta/llama-3.2-1b-instruct",
+          "meta/llama-3.2-3b-instruct",
+          "meta/llama-3.3-70b-instruct",
+          "meta/llama-4-maverick-17b-128e-instruct",
+          "meta/llama2-70b",
+          "meta/codellama-70b"
+        ],
+        "nvidia": [
+          "nvidia/llama-3.1-nemotron-70b-instruct",
+          "nvidia/llama-3.1-nemotron-51b-instruct",
+          "nvidia/llama-3.1-nemotron-nano-8b-v1",
+          "nvidia/llama-3.3-nemotron-super-49b-v1",
+          "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+          "nvidia/nemotron-4-340b-instruct",
+          "nvidia/nemotron-4-340b-reward",
+          "nvidia/nemotron-3-super-120b-a12b",
+          "nvidia/nemotron-3-nano-30b-a3b",
+          "nvidia/nemotron-mini-4b-instruct",
+          "nvidia/nemotron-nano-12b-v2-vl",
+          "nvidia/nemotron-nano-3-30b-a3b",
+          "nvidia/nvidia-nemotron-nano-9b-v2",
+          "nvidia/cosmos-reason2-8b",
+          "nvidia/llama3-chatqa-1.5-70b"
+        ],
+        "mistral": [
+          "mistralai/mistral-7b-instruct-v0.3",
+          "mistralai/mistral-large",
+          "mistralai/mistral-large-2-instruct",
+          "mistralai/mistral-large-3-675b-instruct-2512",
+          "mistralai/mistral-medium-3-instruct",
+          "mistralai/mistral-small-4-119b-2603",
+          "mistralai/mistral-nemotron",
+          "mistralai/mixtral-8x7b-instruct-v0.1",
+          "mistralai/mixtral-8x22b-instruct-v0.1",
+          "mistralai/mixtral-8x22b-v0.1",
+          "mistralai/ministral-14b-instruct-2512",
+          "mistralai/devstral-2-123b-instruct-2512",
+          "mistralai/codestral-22b-instruct-v0.1",
+          "mistralai/magistral-small-2506",
+          "nv-mistralai/mistral-nemo-12b-instruct",
+          "nvidia/mistral-nemo-minitron-8b-8k-instruct"
+        ],
+        "microsoft": [
+          "microsoft/phi-3-vision-128k-instruct",
+          "microsoft/phi-3.5-moe-instruct",
+          "microsoft/phi-4-mini-instruct",
+          "microsoft/phi-4-multimodal-instruct",
+          "microsoft/kosmos-2"
+        ],
+        "google": [
+          "google/gemma-2-2b-it",
+          "google/gemma-2b",
+          "google/gemma-3-4b-it",
+          "google/gemma-3-12b-it",
+          "google/gemma-3-27b-it",
+          "google/gemma-3n-e2b-it",
+          "google/gemma-3n-e4b-it",
+          "google/gemma-4-31b-it",
+          "google/recurrentgemma-2b",
+          "google/codegemma-7b",
+          "google/codegemma-1.1-7b"
+        ],
+        "qwen": [
+          "qwen/qwen2.5-coder-32b-instruct",
+          "qwen/qwen3-coder-480b-a35b-instruct",
+          "qwen/qwen3-next-80b-a3b-instruct",
+          "qwen/qwen3-next-80b-a3b-thinking",
+          "qwen/qwen3.5-122b-a10b",
+          "qwen/qwen3.5-397b-a17b"
+        ],
+        "deepseek": [
+          "deepseek-ai/deepseek-coder-6.7b-instruct",
+          "deepseek-ai/deepseek-v3.1-terminus",
+          "deepseek-ai/deepseek-v3.2",
+          "deepseek-ai/deepseek-v4-flash",
+          "deepseek-ai/deepseek-v4-pro"
+        ],
+        "ibm": [
+          "ibm/granite-3.0-3b-a800m-instruct",
+          "ibm/granite-3.0-8b-instruct",
+          "ibm/granite-8b-code-instruct",
+          "ibm/granite-34b-code-instruct"
+        ],
+        "others": [
+          "01-ai/yi-large",
+          "abacusai/dracarys-llama-3.1-70b-instruct",
+          "adept/fuyu-8b",
+          "ai21labs/jamba-1.5-large-instruct",
+          "aisingapore/sea-lion-7b-instruct",
+          "bytedance/seed-oss-36b-instruct",
+          "databricks/dbrx-instruct",
+          "minimaxai/minimax-m2.5",
+          "minimaxai/minimax-m2.7",
+          "moonshotai/kimi-k2-instruct",
+          "moonshotai/kimi-k2-instruct-0905",
+          "moonshotai/kimi-k2-thinking",
+          "moonshotai/kimi-k2.5",
+          "openai/gpt-oss-20b",
+          "openai/gpt-oss-120b",
+          "sarvamai/sarvam-m",
+          "stockmark/stockmark-2-100b-instruct",
+          "upstage/solar-10.7b-instruct",
+          "writer/palmyra-creative-122b",
+          "writer/palmyra-fin-70b-32k",
+          "writer/palmyra-med-70b",
+          "writer/palmyra-med-70b-32k",
+          "z-ai/glm-5.1",
+          "z-ai/glm4.7",
+          "z-ai/glm5",
+          "zyphra/zamba2-7b-instruct",
+          "stepfun-ai/step-3.5-flash",
+          "bigcode/starcoder2-15b"
+        ]
+      },
+      "vision": {
+        "meta": [
+          "meta/llama-3.2-11b-vision-instruct",
+          "meta/llama-3.2-90b-vision-instruct"
+        ],
+        "nvidia": [
+          "nvidia/neva-22b",
+          "nvidia/nemotron-nano-12b-v2-vl",
+          "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+          "nvidia/vila"
+        ],
+        "microsoft": [
+          "microsoft/phi-3-vision-128k-instruct",
+          "microsoft/phi-4-multimodal-instruct",
+          "microsoft/kosmos-2"
+        ],
+        "others": [
+          "google/deplot"
+        ]
+      },
       "embeddings": [
+        "nvidia/llama-3.2-nv-embedqa-1b-v1",
         "nvidia/llama-3.2-nv-embedqa-1b-v2",
         "nvidia/nv-embed-v1",
-        "nvidia/nv-embedqa-mistral-7b-v2"
+        "nvidia/nv-embedqa-e5-v5",
+        "nvidia/nv-embedqa-mistral-7b-v2",
+        "nvidia/llama-nemotron-embed-1b-v2",
+        "nvidia/llama-nemotron-embed-vl-1b-v2",
+        "nvidia/llama-3.2-nemoretriever-300m-embed-v1",
+        "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+        "nvidia/nv-embedcode-7b-v1",
+        "nvidia/nvclip",
+        "snowflake/arctic-embed-l",
+        "baai/bge-m3"
       ],
       "reranking": [
         "nvidia/nv-rerankqa-mistral-4b-v3"
       ],
       "code": [
-        "nvidia/starcoder2-15b"
+        "bigcode/starcoder2-15b",
+        "google/codegemma-7b",
+        "google/codegemma-1.1-7b",
+        "meta/codellama-70b",
+        "ibm/granite-8b-code-instruct",
+        "ibm/granite-34b-code-instruct",
+        "mistralai/codestral-22b-instruct-v0.1",
+        "deepseek-ai/deepseek-coder-6.7b-instruct",
+        "qwen/qwen2.5-coder-32b-instruct",
+        "qwen/qwen3-coder-480b-a35b-instruct",
+        "nvidia/nv-embedcode-7b-v1"
+      ],
+      "safety": [
+        "nvidia/llama-3.1-nemoguard-8b-content-safety",
+        "nvidia/llama-3.1-nemoguard-8b-topic-control",
+        "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+        "nvidia/nemotron-3-content-safety",
+        "nvidia/nemotron-content-safety-reasoning-4b"
+      ],
+      "translation": [
+        "nvidia/riva-translate-4b-instruct",
+        "nvidia/riva-translate-4b-instruct-v1.1"
+      ],
+      "video": [
+        "nvidia/ai-synthetic-video-detector"
+      ],
+      "parsing": [
+        "nvidia/nemoretriever-parse",
+        "nvidia/nemotron-parse"
       ]
-    }
+    },
+    "total_models": 150,
+    "updated_at": "2026-04-26"
   },
   "budgets": {
     "daily_max_usd": 5.00,
