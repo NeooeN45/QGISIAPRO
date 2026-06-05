@@ -7,6 +7,8 @@ Parlez à vos données géographiques, générez du code PyQGIS, analysez vos co
 
 **Version courante : 3.4** — source unique de vérité : fichier `VERSION` à la racine.
 
+**Nom produit** : « GeoSylva AI » (marketing) = plugin QGIS « QGISIA2 » (identifiant technique). Aucun renommage de code à ce stade — note de cohérence uniquement.
+
 [![QGIS](https://img.shields.io/badge/QGIS-3.16%2B%20%7C%204.0-green?logo=qgis&logoColor=white)](https://qgis.org)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python&logoColor=white)](https://python.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev)
