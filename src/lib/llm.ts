@@ -16,6 +16,8 @@ import { useThinkingStore } from "../stores/useThinkingStore";
 import { useStreamingStore, createMessageId } from "../stores/useStreamingStore";
 import { useSmartSuggestionsStore } from "../stores/useSmartSuggestionsStore";
 import { buildGeminiParts, filterValidImages } from "./vision-multipart";
+import { useGatewayStore } from "../stores/useGatewayStore";
+import { streamToText as gatewayStreamToText, type ChatMessage } from "./litellm-client";
 
 interface GenerateAssistantReplyInput {
   conversation: ChatConversation;
@@ -663,10 +665,63 @@ export async function repairPythonScriptWithProvider(
   }
 }
 
+/**
+ * Branche Gateway : tout le chat passe par le gateway LiteLLM (NVIDIA NIM au coeur).
+ * Active uniquement si useGatewayStore.config.useGateway === true (OFF par defaut),
+ * donc 100% additif : le comportement actuel reste inchange tant qu'on ne l'active pas.
+ */
+async function generateViaGateway(
+  input: GenerateAssistantReplyInput,
+): Promise<string> {
+  const thinkingStore = useThinkingStore.getState();
+  const streamingStore = useStreamingStore.getState();
+  const gateway = useGatewayStore.getState().config;
+
+  try {
+    thinkingStore.setPhase("ANALYZING_INTENT", {
+      message: "Connexion au gateway NVIDIA NIM...",
+      subMessage: `Cerveau : ${gateway.defaultAlias}`,
+    });
+    streamingStore.startStreaming(createMessageId());
+    thinkingStore.setPhase("STREAMING_RESPONSE", { modelName: gateway.defaultAlias });
+
+    const messages: ChatMessage[] = [
+      { role: "system", content: DEFAULT_LOCAL_SYSTEM_PROMPT },
+      { role: "user", content: input.prompt },
+    ];
+
+    const full = await gatewayStreamToText(
+      {
+        model: gateway.defaultAlias,
+        messages,
+        api_keys: gateway.apiKeys,
+        signal: input.signal,
+      },
+      (delta) => streamingStore.addChunk(delta),
+    );
+
+    setTimeout(() => {
+      thinkingStore.reset();
+      streamingStore.completeStreaming();
+    }, 300);
+
+    return full || "Operation terminee, sans message complementaire.";
+  } catch (error) {
+    thinkingStore.reset();
+    streamingStore.completeStreaming();
+    throw error;
+  }
+}
+
 export async function generateAssistantReply(
   input: GenerateAssistantReplyInput,
 ): Promise<string> {
   const { settings } = input;
+
+  // Cerveau unifie : si le gateway est active, tout le chat passe par lui (NVIDIA NIM coeur).
+  if (useGatewayStore.getState().config.useGateway) {
+    return generateViaGateway(input);
+  }
 
   if (settings.provider === "local") {
     // Utiliser l'orchestrateur multi-modèles avec feedback visuel
