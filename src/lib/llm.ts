@@ -17,7 +17,11 @@ import { useStreamingStore, createMessageId } from "../stores/useStreamingStore"
 import { useSmartSuggestionsStore } from "../stores/useSmartSuggestionsStore";
 import { buildGeminiParts, filterValidImages } from "./vision-multipart";
 import { useGatewayStore } from "../stores/useGatewayStore";
-import { streamToText as gatewayStreamToText, type ChatMessage } from "./litellm-client";
+import {
+  streamToText as gatewayStreamToText,
+  smartProcess as gatewaySmartProcess,
+  type ChatMessage,
+} from "./litellm-client";
 
 interface GenerateAssistantReplyInput {
   conversation: ChatConversation;
@@ -670,12 +674,71 @@ export async function repairPythonScriptWithProvider(
  * Active uniquement si useGatewayStore.config.useGateway === true (OFF par defaut),
  * donc 100% additif : le comportement actuel reste inchange tant qu'on ne l'active pas.
  */
+/**
+ * Mode "SIG Intelligent" : la federation multi-agents route la requete vers le
+ * meilleur agent NVIDIA selon la tache (code / vision / raisonnement...).
+ */
+async function generateViaFederation(
+  input: GenerateAssistantReplyInput,
+): Promise<string> {
+  const thinkingStore = useThinkingStore.getState();
+  const streamingStore = useStreamingStore.getState();
+  const gateway = useGatewayStore.getState().config;
+
+  try {
+    thinkingStore.setPhase("ANALYZING_INTENT", {
+      message: "Fédération multi-agents : routage de votre demande...",
+      subMessage: "Sélection du meilleur agent NVIDIA selon la tâche",
+    });
+    streamingStore.startStreaming(createMessageId());
+
+    const result = await gatewaySmartProcess({
+      query: input.latestUserMessage,
+      api_keys: gateway.apiKeys,
+      signal: input.signal,
+    });
+
+    const agent = result.agent_results?.[0];
+    const header = result.routing
+      ? `🧭 Agent : **${result.routing}**`
+        + (agent?.model_used ? ` · modèle \`${agent.model_used}\`` : "")
+        + "\n\n"
+      : "";
+    const content =
+      agent?.content || result.error || "La fédération n'a pas produit de réponse.";
+    const synthesis = result.synthesis
+      ? `\n\n---\n**Synthèse :** ${result.synthesis}`
+      : "";
+    const full = header + content + synthesis;
+
+    const chunkSize = 12;
+    for (let i = 0; i < full.length; i += chunkSize) {
+      streamingStore.addChunk(full.slice(i, i + chunkSize));
+      await new Promise((r) => setTimeout(r, 2));
+    }
+    setTimeout(() => {
+      thinkingStore.reset();
+      streamingStore.completeStreaming();
+    }, 300);
+    return full;
+  } catch (error) {
+    thinkingStore.reset();
+    streamingStore.completeStreaming();
+    throw error;
+  }
+}
+
 async function generateViaGateway(
   input: GenerateAssistantReplyInput,
 ): Promise<string> {
   const thinkingStore = useThinkingStore.getState();
   const streamingStore = useStreamingStore.getState();
   const gateway = useGatewayStore.getState().config;
+
+  // Mode SIG Intelligent : on delegue a la federation multi-agents.
+  if (gateway.federationMode) {
+    return generateViaFederation(input);
+  }
 
   try {
     thinkingStore.setPhase("ANALYZING_INTENT", {

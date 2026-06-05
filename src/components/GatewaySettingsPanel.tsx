@@ -96,6 +96,7 @@ export function GatewaySettingsPanel() {
   const setDefaultAlias = useGatewayStore((s) => s.setDefaultAlias);
   const setUseGateway = useGatewayStore((s) => s.setUseGateway);
   const setAutoMode = useGatewayStore((s) => s.setAutoMode);
+  const setFederationMode = useGatewayStore((s) => s.setFederationMode);
 
   const gw = useLLMGateway();
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -291,6 +292,13 @@ export function GatewaySettingsPanel() {
           checked={config.autoMode}
           onChange={setAutoMode}
           accent="amber"
+        />
+        <ToggleCard
+          title="Mode SIG Intelligent (fédération)"
+          description="Route chaque demande vers le meilleur agent NVIDIA (code, vision, raisonnement...). Nécessite le Gateway actif."
+          checked={config.federationMode}
+          onChange={setFederationMode}
+          accent="indigo"
         />
       </div>
 

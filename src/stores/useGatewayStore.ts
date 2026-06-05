@@ -17,6 +17,7 @@ export interface GatewayConfig {
   defaultAlias: string; // ex: "smart-default"
   useGateway: boolean;  // feature flag de migration
   autoMode: boolean;    // toggle Auto (Plan+Confirm sinon)
+  federationMode: boolean; // SIG Intelligent : routage multi-agents (/api/llm/smart)
   status: GatewayStatus;
   lastError?: string;
 }
@@ -28,6 +29,7 @@ const DEFAULT_CONFIG: GatewayConfig = {
   defaultAlias: "smart-default",
   useGateway: false, // OFF par defaut — on bascule progressivement
   autoMode: false,   // Plan+Confirm par defaut (charte D1)
+  federationMode: false, // OFF par defaut — mode mono-cerveau sinon
   status: "unknown",
 };
 
@@ -90,6 +92,7 @@ interface GatewayStore {
   setDefaultAlias: (alias: string) => void;
   setUseGateway: (on: boolean) => void;
   setAutoMode: (on: boolean) => void;
+  setFederationMode: (on: boolean) => void;
   setStatus: (status: GatewayStatus, error?: string) => void;
   hasAnyKey: () => boolean;
   getApiKeys: () => ApiKeys;
@@ -133,6 +136,13 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   setAutoMode: (on) =>
     set((state) => {
       const config = { ...state.config, autoMode: on };
+      persistConfig(config);
+      return { config };
+    }),
+
+  setFederationMode: (on) =>
+    set((state) => {
+      const config = { ...state.config, federationMode: on };
       persistConfig(config);
       return { config };
     }),
