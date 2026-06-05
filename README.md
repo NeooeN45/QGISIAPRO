@@ -5,6 +5,8 @@
 **Un assistant SIG intelligent directement dans QGIS.**  
 Parlez à vos données géographiques, générez du code PyQGIS, analysez vos couches — le tout avec l'IA.
 
+**Version courante : 3.4** — source unique de vérité : fichier `VERSION` à la racine.
+
 [![QGIS](https://img.shields.io/badge/QGIS-3.16%2B%20%7C%204.0-green?logo=qgis&logoColor=white)](https://qgis.org)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python&logoColor=white)](https://python.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev)
