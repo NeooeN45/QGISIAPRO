@@ -1,0 +1,230 @@
+{
+  "generated_at": "2026-06-05 23:23:07",
+  "api_key_preview": "nvapi-PF...mpoi",
+  "summary": {
+    "total": 22,
+    "working": 21,
+    "failed": 1,
+    "working_by_role": {
+      "router": [
+        "nvidia_nim/nvidia/nemotron-3-nano-30b-a3b",
+        "nvidia_nim/nvidia/nemotron-mini-4b-instruct"
+      ],
+      "general": [
+        "nvidia_nim/nvidia/nemotron-3-super-120b-a12b",
+        "nvidia_nim/meta/llama-3.3-70b-instruct",
+        "nvidia_nim/openai/gpt-oss-120b"
+      ],
+      "reasoning": [
+        "nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
+        "nvidia_nim/deepseek-ai/deepseek-v4-flash",
+        "nvidia_nim/z-ai/glm-5.1",
+        "nvidia_nim/meta/llama-3.1-70b-instruct"
+      ],
+      "code": [
+        "nvidia_nim/qwen/qwen3-coder-480b-a35b-instruct"
+      ],
+      "vision_fast": [
+        "nvidia_nim/nvidia/nemotron-nano-12b-v2-vl",
+        "nvidia_nim/meta/llama-3.2-11b-vision-instruct"
+      ],
+      "vision_deep": [
+        "nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        "nvidia_nim/qwen/qwen3.5-397b-a17b",
+        "nvidia_nim/meta/llama-3.2-90b-vision-instruct"
+      ],
+      "doc_intel": [
+        "nvidia_nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+        "nvidia_nim/microsoft/phi-4-multimodal-instruct"
+      ],
+      "extract_json": [
+        "nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512"
+      ],
+      "safety": [
+        "nvidia_nim/nvidia/nemotron-3.5-content-safety",
+        "nvidia_nim/nvidia/llama-3.1-nemotron-safety-guard-8b-v3"
+      ],
+      "translate": [
+        "nvidia_nim/nvidia/riva-translate-4b-instruct-v1.1"
+      ]
+    }
+  },
+  "results": [
+    {
+      "role": "router",
+      "model": "nvidia_nim/nvidia/nemotron-3-nano-30b-a3b",
+      "ok": true,
+      "latency_ms": 5963.5,
+      "error": null,
+      "response_preview": ""
+    },
+    {
+      "role": "router",
+      "model": "nvidia_nim/nvidia/nemotron-mini-4b-instruct",
+      "ok": true,
+      "latency_ms": 180.7,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "general",
+      "model": "nvidia_nim/nvidia/nemotron-3-super-120b-a12b",
+      "ok": true,
+      "latency_ms": 510.5,
+      "error": null,
+      "response_preview": "User wants only \"OK\". Must comply"
+    },
+    {
+      "role": "general",
+      "model": "nvidia_nim/meta/llama-3.3-70b-instruct",
+      "ok": true,
+      "latency_ms": 400.2,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "general",
+      "model": "nvidia_nim/openai/gpt-oss-120b",
+      "ok": true,
+      "latency_ms": 1215.2,
+      "error": null,
+      "response_preview": ""
+    },
+    {
+      "role": "reasoning",
+      "model": "nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
+      "ok": true,
+      "latency_ms": 99866.9,
+      "error": null,
+      "response_preview": "The user wants me to respond with only"
+    },
+    {
+      "role": "reasoning",
+      "model": "nvidia_nim/deepseek-ai/deepseek-v4-flash",
+      "ok": true,
+      "latency_ms": 706807.3,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "reasoning",
+      "model": "nvidia_nim/z-ai/glm-5.1",
+      "ok": true,
+      "latency_ms": 381911.5,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "reasoning",
+      "model": "nvidia_nim/meta/llama-3.1-70b-instruct",
+      "ok": true,
+      "latency_ms": 401.5,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "code",
+      "model": "nvidia_nim/qwen/qwen3-coder-480b-a35b-instruct",
+      "ok": true,
+      "latency_ms": 9576.0,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "code",
+      "model": "nvidia_nim/mistralai/mistral-small-4-119b-2603",
+      "ok": false,
+      "latency_ms": 907929.6,
+      "error": "Tous les modeles ont echoue. Dernier: litellm.Timeout: Timeout Error: Nvidia_nimException - Error code: 504",
+      "response_preview": ""
+    },
+    {
+      "role": "vision_fast",
+      "model": "nvidia_nim/nvidia/nemotron-nano-12b-v2-vl",
+      "ok": true,
+      "latency_ms": 29989.9,
+      "error": null,
+      "response_preview": "OK\n"
+    },
+    {
+      "role": "vision_fast",
+      "model": "nvidia_nim/meta/llama-3.2-11b-vision-instruct",
+      "ok": true,
+      "latency_ms": 239440.3,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "vision_deep",
+      "model": "nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "ok": true,
+      "latency_ms": 399.1,
+      "error": null,
+      "response_preview": ""
+    },
+    {
+      "role": "vision_deep",
+      "model": "nvidia_nim/qwen/qwen3.5-397b-a17b",
+      "ok": true,
+      "latency_ms": 1926.3,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "vision_deep",
+      "model": "nvidia_nim/meta/llama-3.2-90b-vision-instruct",
+      "ok": true,
+      "latency_ms": 340.5,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "doc_intel",
+      "model": "nvidia_nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+      "ok": true,
+      "latency_ms": 253.4,
+      "error": null,
+      "response_preview": "OK"
+    },
+    {
+      "role": "doc_intel",
+      "model": "nvidia_nim/microsoft/phi-4-multimodal-instruct",
+      "ok": true,
+      "latency_ms": 240.3,
+      "error": null,
+      "response_preview": "D'accord, OK. Comment puis-je"
+    },
+    {
+      "role": "extract_json",
+      "model": "nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512",
+      "ok": true,
+      "latency_ms": 150437.3,
+      "error": null,
+      "response_preview": "OK."
+    },
+    {
+      "role": "safety",
+      "model": "nvidia_nim/nvidia/nemotron-3.5-content-safety",
+      "ok": true,
+      "latency_ms": 234.3,
+      "error": null,
+      "response_preview": "User Safety: safe"
+    },
+    {
+      "role": "safety",
+      "model": "nvidia_nim/nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+      "ok": true,
+      "latency_ms": 325.8,
+      "error": null,
+      "response_preview": "{\"User Safety\": \"safe\"} "
+    },
+    {
+      "role": "translate",
+      "model": "nvidia_nim/nvidia/riva-translate-4b-instruct-v1.1",
+      "ok": true,
+      "latency_ms": 242.0,
+      "error": null,
+      "response_preview": "にのみ返信: OK"
+    }
+  ]
+}

@@ -67,6 +67,38 @@ def test_dry_run_makes_no_network_call(capsys):
 
 def test_main_without_key_exits_nonzero(monkeypatch, capsys):
     monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+    # Isole du .env.local reel (qui peut contenir une vraie cle)
+    monkeypatch.setattr(v, "apply_env_files", lambda root: None)
     rc = v.main(["prog"])
     assert rc == 1
     assert "cle API NVIDIA requise" in capsys.readouterr().out
+
+
+def test_load_env_file_parses_and_ignores_noise(tmp_path):
+    f = tmp_path / ".env.local"
+    f.write_text(
+        "# commentaire\n"
+        "\n"
+        'NVIDIA_API_KEY="nvapi-abc"\n'
+        "GROQ_API_KEY=gsk_x\n"
+        "ligne_sans_egal\n",
+        encoding="utf-8",
+    )
+    env = v.load_env_file(f)
+    assert env == {"NVIDIA_API_KEY": "nvapi-abc", "GROQ_API_KEY": "gsk_x"}
+
+
+def test_load_env_file_absent_returns_empty(tmp_path):
+    assert v.load_env_file(tmp_path / "absent.env") == {}
+
+
+def test_resolve_api_key_ignores_placeholder(monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "colle_ta_cle_ici")
+    assert v.resolve_api_key(["prog"]) is None
+
+
+def test_apply_env_files_does_not_override_existing(monkeypatch, tmp_path):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-deja-la")
+    (tmp_path / ".env.local").write_text("NVIDIA_API_KEY=nvapi-fichier", encoding="utf-8")
+    v.apply_env_files(tmp_path)
+    assert v.os.environ["NVIDIA_API_KEY"] == "nvapi-deja-la"

@@ -100,7 +100,7 @@ def build_entry(role: str, model: str, ok: bool, latency_ms: float,
         "ok": ok,
         "latency_ms": round(latency_ms, 1),
         "error": error,
-        "response_preview": response[:60],
+        "response_preview": (response or "")[:60],
     }
 
 
@@ -118,12 +118,38 @@ def summarize(results: list[dict]) -> dict:
     }
 
 
+# Valeurs placeholder a ignorer (fichier .env.local non rempli)
+PLACEHOLDERS = {"", "colle_ta_cle_ici", "ta_cle_ici", "ta_nouvelle_cle", "nvapi-xxx"}
+
+
+def load_env_file(path: Path) -> dict:
+    """Parse un .env simple (KEY=VALUE). Ignore commentaires et lignes vides."""
+    env: dict[str, str] = {}
+    if not path.is_file():
+        return env
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        key, _, val = s.partition("=")
+        env[key.strip()] = val.strip().strip('"').strip("'")
+    return env
+
+
+def apply_env_files(root: Path) -> None:
+    """Charge .env.local puis .env (sans ecraser les variables deja definies)."""
+    for name in (".env.local", ".env"):
+        for key, val in load_env_file(root / name).items():
+            os.environ.setdefault(key, val)
+
+
 def resolve_api_key(argv: list[str]) -> str | None:
-    """Cle depuis argv[1] (hors flags) sinon NVIDIA_API_KEY. Jamais en dur."""
+    """Cle depuis argv (hors flags) sinon NVIDIA_API_KEY. Ignore les placeholders."""
     for arg in argv[1:]:
-        if not arg.startswith("-"):
+        if not arg.startswith("-") and arg not in PLACEHOLDERS:
             return arg
-    return os.environ.get("NVIDIA_API_KEY")
+    key = os.environ.get("NVIDIA_API_KEY", "")
+    return key if key not in PLACEHOLDERS else None
 
 
 def _probe_model(model: str, api_key: str, timeout: int = 30) -> tuple[bool, float, str | None, str]:
@@ -139,7 +165,7 @@ def _probe_model(model: str, api_key: str, timeout: int = 30) -> tuple[bool, flo
             max_tokens=8,
         )
         latency = (time.time() - start) * 1000
-        content = resp["choices"][0]["message"]["content"]
+        content = resp["choices"][0]["message"]["content"] or ""
         return True, latency, None, content
     except Exception as exc:  # noqa: BLE001
         latency = (time.time() - start) * 1000
@@ -180,9 +206,11 @@ def main(argv: list[str]) -> int:
             print(f"  {role:12s} nvidia_nim/{model}")
         return 0
 
+    apply_env_files(ROOT)
     api_key = resolve_api_key(argv)
     if not api_key:
         print("ERREUR: cle API NVIDIA requise.")
+        print("  Astuce: mets ta cle dans .env.local (NVIDIA_API_KEY=...) a la racine.")
         print("  Usage: python scripts/validate_nvidia_models.py <NVIDIA_API_KEY>")
         print("     ou: $env:NVIDIA_API_KEY='nvapi-...' ; python scripts/validate_nvidia_models.py")
         return 1
