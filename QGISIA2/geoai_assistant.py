@@ -2871,6 +2871,50 @@ class ThreadedAssetServer:
                 self._send_json(handler, 200, {"ok": True, "response": result})
                 return True
 
+            if route == "/api/llm/smart":
+                # Federation multi-agents : routage -> agent specialise -> safety.
+                if not llm_installer.is_vendor_ready():
+                    self._send_json(handler, 503, {"ok": False, "error": "gateway_not_ready"})
+                    return True
+
+                query = body.get("query") or body.get("message") or ""
+                if not query:
+                    self._send_json(handler, 400, {"ok": False, "error": "missing 'query'"})
+                    return True
+
+                api_keys = body.get("api_keys", {}) or {}
+                context = body.get("context") or {}
+                auto_route = bool(body.get("auto_route", True))
+
+                try:
+                    from agent_federation import AgentFederation
+                except ImportError:
+                    from .agent_federation import AgentFederation
+
+                logs = []
+                federation = AgentFederation(api_keys)
+                result = federation.process(
+                    query,
+                    auto_route=auto_route,
+                    context=context,
+                    progress_callback=lambda m: logs.append({"i": len(logs), "message": m}),
+                )
+                # AgentResult (dataclass) -> dict JSON-serialisable
+                result["agent_results"] = [
+                    {
+                        "agent_type": r.agent_type.value,
+                        "success": r.success,
+                        "content": r.content,
+                        "latency_ms": r.latency_ms,
+                        "model_used": r.model_used,
+                        "error": r.error,
+                    }
+                    for r in result.get("agent_results", [])
+                ]
+                result["progress_logs"] = logs
+                self._send_json(handler, 200, {"ok": True, "result": result})
+                return True
+
             return False
         except Exception as exc:
             self._send_json(handler, 500, {

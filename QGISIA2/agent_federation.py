@@ -47,112 +47,106 @@ class AgentResult:
     error: Optional[str] = None
 
 
+# Chaque agent pointe sur un ALIAS de QGISIA2/config/models.json (source unique de
+# verite). Le gateway resout l'alias -> modele NVIDIA valide + chaine de fallback curee.
+# On ne code donc plus de modeles en dur ici (fini les modeles morts).
 AGENT_REGISTRY: Dict[AgentType, AgentConfig] = {
     AgentType.ROUTER: AgentConfig(
         name="Intent Router",
         agent_type=AgentType.ROUTER,
-        model="nvidia_nim/nvidia/nemotron-mini-4b-instruct",
+        model="intent-router",
         temperature=0.0,
         max_tokens=100,
         system_prompt="""Tu es un router d'intention. Analyse la requete et retourne le type d'agent: CODE, VISION, REASONING, SUMMARIZER, TRANSLATOR, SAFETY, EXTRACTOR, QGIS_EXPERT. Reponds UNIQUEMENT avec le type.""",
-        fallback_models=["nvidia_nim/meta/llama-3.1-8b-instruct"],
-        timeout_seconds=5
+        fallback_models=[],
+        timeout_seconds=10
     ),
-    
+
     AgentType.CODE_GENERATOR: AgentConfig(
         name="PyQGIS Code Generator",
         agent_type=AgentType.CODE_GENERATOR,
-        model="nvidia_nim/qwen/qwen2.5-coder-32b-instruct",
+        model="code-pyqgis",
         temperature=0.1,
         max_tokens=4096,
         system_prompt="""Tu es un expert PyQGIS et GDAL. Genere du code Python propre, commente et fonctionnel. Utilise QGIS 3.x API. Inclut gestion d'erreurs try/except. Prefere processing.run(). Retourne code uniquement sans markdown.""",
-        fallback_models=[
-            "nvidia_nim/mistralai/codestral-22b-instruct-v0.1",
-            "nvidia_nim/deepseek-ai/deepseek-coder-6.7b-instruct"
-        ],
+        fallback_models=[],
         timeout_seconds=120
     ),
-    
+
     AgentType.VISION_ANALYZER: AgentConfig(
         name="Vision Cartographique",
         agent_type=AgentType.VISION_ANALYZER,
-        model="nvidia_nim/meta/llama-3.2-90b-vision-instruct",
+        model="vision",
         temperature=0.2,
         max_tokens=2048,
         system_prompt="""Tu es un expert en cartographie. Analyse les cartes IGN, orthophotos, plans et images satellites. Identifie elements geographiques, legendes, echelles.""",
-        fallback_models=["nvidia_nim/meta/llama-3.2-11b-vision-instruct"],
+        fallback_models=[],
         timeout_seconds=60
     ),
-    
+
     AgentType.REASONING: AgentConfig(
         name="Spatial Reasoning Expert",
         agent_type=AgentType.REASONING,
-        model="nvidia_nim/nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        model="reasoning",
         temperature=0.2,
         max_tokens=4096,
         system_prompt="""Tu es un expert en analyse spatiale. Capacites: analyse de proximite, calculs de densite, requetes spatiales complexes, analyses de reseaux, optimisation spatiale, analyses multicriteres. Explique ton raisonnement etape par etape.""",
-        fallback_models=[
-            "nvidia_nim/nvidia/nemotron-4-340b-instruct",
-            "nvidia_nim/meta/llama-3.1-405b-instruct"
-        ],
-        timeout_seconds=120
+        fallback_models=[],
+        timeout_seconds=180
     ),
-    
+
     AgentType.SUMMARIZER: AgentConfig(
         name="Content Synthesizer",
         agent_type=AgentType.SUMMARIZER,
-        model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        model="smart-default",
         temperature=0.3,
         max_tokens=1024,
         system_prompt="""Synthese concise. Extraire points cles, langage clair, maximum 3-4 phrases par concept.""",
-        fallback_models=["nvidia_nim/meta/llama-3.3-70b-instruct"],
+        fallback_models=[],
         timeout_seconds=30
     ),
-    
+
     AgentType.TRANSLATOR: AgentConfig(
         name="Multilingual Translator",
         agent_type=AgentType.TRANSLATOR,
-        model="nvidia_nim/nvidia/riva-translate-4b-instruct-v1.1",
+        model="translate",
         temperature=0.0,
         max_tokens=2048,
         system_prompt="Traduction precise FR-EN pour documentation SIG et termes techniques. Preserve terminologie geospatiale. Reponds uniquement avec la traduction.",
-        fallback_models=["nvidia_nim/nvidia/riva-translate-4b-instruct"],
+        fallback_models=[],
         timeout_seconds=10
     ),
-    
+
     AgentType.SAFETY_GUARD: AgentConfig(
         name="Content Safety Guard",
         agent_type=AgentType.SAFETY_GUARD,
-        model="nvidia_nim/nvidia/llama-3.1-nemoguard-8b-content-safety",
+        model="safety",
         temperature=0.0,
         max_tokens=50,
         system_prompt="""Verifie la securite du contenu. Reponds: SAFE (acceptable), UNSAFE (problem), ou CHECK (verification humaine).""",
-        fallback_models=["nvidia_nim/nvidia/nemotron-3-content-safety"],
-        timeout_seconds=5
+        fallback_models=[],
+        timeout_seconds=10
     ),
-    
+
     AgentType.DATA_EXTRACTOR: AgentConfig(
         name="Structured Data Extractor",
         agent_type=AgentType.DATA_EXTRACTOR,
-        model="nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512",
+        model="extract-json",
         temperature=0.1,
         max_tokens=2048,
         system_prompt="""Extraction de donnees structurees. Retourne UNIQUEMENT du JSON valide. Pas de markdown. Exemple: {"parcelles": [{"id": "123", "surface_m2": 1500}]}""",
-        fallback_models=[
-            "nvidia_nim/mistralai/mistral-large-2-instruct",
-            "nvidia_nim/meta/llama-3.1-70b-instruct"
-        ],
-        timeout_seconds=30
+        fallback_models=[],
+        timeout_seconds=60
     ),
-    
+
     AgentType.QGIS_EXPERT: AgentConfig(
         name="QGIS Native Expert",
         agent_type=AgentType.QGIS_EXPERT,
-        model="nvidia_nim/meta/llama-3.3-70b-instruct",
+        model="smart-default",
         temperature=0.2,
         max_tokens=2048,
         system_prompt="""Expert QGIS natif. Interface, outils, plugins, Processing framework, expressions, styles, layouts, SQL spatial. Donne instructions precises etape par etape.""",
-        fallback_models=["nvidia_nim/meta/llama-3.1-70b-instruct"],
+        fallback_models=[],
         timeout_seconds=30
     )
 }
