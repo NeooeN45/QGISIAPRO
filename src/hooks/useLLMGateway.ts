@@ -16,6 +16,7 @@ import {
   getInstallStatus as gwGetInstallStatus,
   runDiagnostic as gwRunDiagnostic,
   installGatewaySync as gwInstallGatewaySync,
+  smartProcess as gwSmartProcess,
   type ChatRequest,
   type ChatResponse,
   type ChatChunk,
@@ -25,6 +26,8 @@ import {
   type InstallLog,
   type DiagnosticInfo,
   type StreamResult,
+  type SmartRequest,
+  type SmartResult,
 } from "../lib/litellm-client";
 import { useGatewayStore } from "../stores/useGatewayStore";
 
@@ -47,6 +50,7 @@ export interface UseLLMGatewayResult {
     onDelta?: (delta: string, full: string) => void,
     onRetry?: (attempt: number, error: string) => void,
   ) => Promise<StreamResult>;
+  smart: (req: Omit<SmartRequest, "api_keys">) => Promise<SmartResult>;
   listModels: () => Promise<ModelAlias[]>;
   getBudget: () => Promise<BudgetSnapshot>;
   installGateway: () => Promise<void>;
@@ -111,6 +115,11 @@ export function useLLMGateway(): UseLLMGatewayResult {
 
   const streamToTextResilient = useCallback<UseLLMGatewayResult["streamToTextResilient"]>(
     (req, onDelta, onRetry) => gwStreamToTextResilient({ ...req, api_keys: getApiKeys() }, onDelta, onRetry),
+    [getApiKeys],
+  );
+
+  const smart = useCallback<UseLLMGatewayResult["smart"]>(
+    (req) => gwSmartProcess({ ...req, api_keys: getApiKeys() }),
     [getApiKeys],
   );
 
@@ -222,6 +231,7 @@ export function useLLMGateway(): UseLLMGatewayResult {
     streamChat,
     streamToText,
     streamToTextResilient,
+    smart,
     listModels,
     getBudget,
     installGateway,

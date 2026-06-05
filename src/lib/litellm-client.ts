@@ -227,6 +227,51 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
   return data.response;
 }
 
+// ---------------------------------------------------------------------------
+// Federation multi-agents (POST /api/llm/smart)
+// ---------------------------------------------------------------------------
+
+export interface SmartAgentResult {
+  agent_type: string;
+  success: boolean;
+  content: string;
+  latency_ms: number;
+  model_used: string;
+  error: string | null;
+}
+
+export interface SmartResult {
+  query: string;
+  routing: string | null;
+  agent_results: SmartAgentResult[];
+  synthesis: string | null;
+  total_latency_ms: number;
+  progress_logs: Array<{ i: number; message: string }>;
+  error?: string;
+}
+
+export interface SmartRequest {
+  query: string;
+  context?: Record<string, unknown>;
+  auto_route?: boolean;
+  api_keys?: ApiKeys;
+  signal?: AbortSignal;
+}
+
+/** Route la requete via la federation multi-agents (routeur -> agent specialise -> safety). */
+export async function smartProcess(req: SmartRequest): Promise<SmartResult> {
+  const { signal, ...body } = req;
+  const data = await apiFetch<{ ok: boolean; result: SmartResult }>(
+    "/api/llm/smart",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal,
+    },
+  );
+  return data.result;
+}
+
 /**
  * Configuration du streaming robuste.
  */
