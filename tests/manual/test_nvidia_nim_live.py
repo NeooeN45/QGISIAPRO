@@ -8,7 +8,7 @@ import json
 import time
 
 # Ajouter vendor au path
-PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VENDOR_DIR = os.path.join(PLUGIN_DIR, "QGISIA2", "vendor")
 if os.path.exists(VENDOR_DIR) and VENDOR_DIR not in sys.path:
     sys.path.insert(0, VENDOR_DIR)

@@ -2,7 +2,7 @@
 """Test de la gateway avec NVIDIA NIM"""
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'QGISIA2'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'QGISIA2'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'QGISIA2', 'vendor'))
 
 # Test du build kwargs

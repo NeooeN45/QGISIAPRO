@@ -2,7 +2,7 @@
 """Test d'installation des dépendances NVIDIA"""
 import sys
 import os
-sys.path.insert(0, 'QGISIA2')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'QGISIA2'))
 
 from nvidia_deps_installer import install_nvidia_deps, get_install_status
 
