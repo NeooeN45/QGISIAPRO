@@ -61,8 +61,8 @@ Re-valider à tout moment : `python scripts/validate_nvidia_models.py`
 ### Outils QGIS (bridge, `mcp_server.py` → `/api/qgis/*`)
 `getLayersList`, `setLayerVisibility`, `setLayerOpacity`, `zoomToLayer`,
 `filterLayer`, `reprojectLayer`, `applyQmlStyle`, `applySymbologyPreset`,
-`addDataSource`, `segmentRasterWithSAM`, `forecastWeatherWithEarth2`,
-`exportProjectReport`, `runScript` (gardé), …
+`addDataSource`, `addRemoteRaster` (COG `/vsicurl/`), `segmentRasterWithSAM`,
+`forecastWeatherWithEarth2`, `exportProjectReport`, `runScript` (gardé), …
 
 ### Outils natifs web/geo/data (`native_tools.py`, en-process, sans clé)
 | Outil | Source |

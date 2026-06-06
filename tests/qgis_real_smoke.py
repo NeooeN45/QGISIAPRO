@@ -166,6 +166,17 @@ def main():
         except Exception as exc:
             rec("bridge.addDataSource.unknown", False, str(exc))
 
+        # Raster distant COG (P3-S2) : charger un COG public via /vsicurl/
+        try:
+            cog_url = "https://raw.githubusercontent.com/cogeotiff/rio-tiler/main/tests/fixtures/cog.tif"
+            n_before = len(QgsProject.instance().mapLayers())
+            msg_cog = bridge.addRemoteRaster(cog_url, "cog_test")
+            n_after = len(QgsProject.instance().mapLayers())
+            rec("bridge.addRemoteRaster", "charge" in msg_cog.lower() and n_after > n_before,
+                f"{msg_cog} | layers {n_before}->{n_after}")
+        except Exception as exc:
+            rec("bridge.addRemoteRaster", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()
