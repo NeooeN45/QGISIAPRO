@@ -2126,6 +2126,42 @@ class QgisBridge(BridgeQObject):
                            "features": len(out_feats), "distance": dist}, ensure_ascii=False)
 
     @BridgeSlot(str, str, str, result=str)
+    def saveVectorLayer(self, layer_ref, output_path, driver):
+        """Exporte une couche vectorielle vers un fichier (livrable) : GeoPackage (GPKG),
+        GeoJSON ou ESRI Shapefile. Utile pour produire un resultat telechargeable.
+        """
+        layer = self._find_layer(str(layer_ref or "").strip())
+        if not isinstance(layer, QgsVectorLayer):
+            self._notify("Couche vectorielle introuvable pour l'export.", Qgis.Warning)
+            return ""
+        out = str(output_path or "").strip()
+        if not out:
+            self._notify("Chemin de sortie requis pour l'export.", Qgis.Warning)
+            return ""
+        driver = str(driver or "").strip() or "GPKG"
+
+        try:
+            from qgis.core import QgsVectorFileWriter, QgsCoordinateTransformContext
+            options = QgsVectorFileWriter.SaveVectorOptions()
+            options.driverName = driver
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
+            res = QgsVectorFileWriter.writeAsVectorFormatV3(
+                layer, out, QgsCoordinateTransformContext(), options)
+            err_code = res[0] if isinstance(res, (tuple, list)) else res
+            if err_code != QgsVectorFileWriter.NoError:
+                detail = res[1] if isinstance(res, (tuple, list)) and len(res) > 1 else ""
+                self._notify(f"Echec de l'export : {detail}", Qgis.Warning, duration=6)
+                return ""
+        except Exception as exc:  # noqa: BLE001
+            self._notify(f"Erreur export : {exc}", Qgis.Critical)
+            return ""
+
+        message = f"Couche exportee : {Path(out).name} ({driver})."
+        self._notify(message, Qgis.Success)
+        return json.dumps({"ok": True, "path": out, "driver": driver,
+                           "features": layer.featureCount()}, ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
             layer_ids = json.loads(layer_ids_json) if layer_ids_json else []
@@ -3005,6 +3041,13 @@ class ThreadedAssetServer:
                     body.get("layerId", ""),
                     str(body.get("distance", "0")),
                     body.get("outputName", ""),
+                )
+            elif route == "/api/qgis/saveVectorLayer":
+                result = self._bridge_call(
+                    "saveVectorLayer",
+                    body.get("layerId", ""),
+                    body.get("outputPath", ""),
+                    body.get("driver", "GPKG"),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(

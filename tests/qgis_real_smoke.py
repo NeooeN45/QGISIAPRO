@@ -291,6 +291,20 @@ def main():
         except Exception as exc:
             rec("bridge.bufferLayer", False, str(exc))
 
+        # Export livrable : sauver une couche en GeoPackage
+        try:
+            import tempfile
+            gpkg = os.path.join(tempfile.gettempdir(), "export_test.gpkg")
+            if os.path.exists(gpkg):
+                os.remove(gpkg)
+            raw_exp = bridge.saveVectorLayer("smoke_buf", gpkg, "GPKG")
+            pexp = json.loads(raw_exp) if raw_exp else {}
+            rec("bridge.saveVectorLayer",
+                pexp.get("ok") is True and os.path.exists(gpkg),
+                f"path={pexp.get('path')} exists={os.path.exists(gpkg)}")
+        except Exception as exc:
+            rec("bridge.saveVectorLayer", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()

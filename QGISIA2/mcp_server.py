@@ -466,6 +466,24 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/bufferLayer",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="saveVectorLayer",
+        description=(
+            "Exporter une couche vectorielle vers un fichier livrable : GeoPackage (GPKG), "
+            "GeoJSON ou ESRI Shapefile."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "outputPath": {"type": "string"},
+                "driver": {"type": "string", "enum": ["GPKG", "GeoJSON", "ESRI Shapefile"]},
+            },
+            "required": ["layerId", "outputPath"],
+        },
+        endpoint="/api/qgis/saveVectorLayer",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 
