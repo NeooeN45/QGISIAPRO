@@ -62,7 +62,8 @@ Re-valider à tout moment : `python scripts/validate_nvidia_models.py`
 `getLayersList`, `setLayerVisibility`, `setLayerOpacity`, `zoomToLayer`,
 `filterLayer`, `reprojectLayer`, `applyQmlStyle`, `applySymbologyPreset`,
 `addDataSource`, `addRemoteRaster` (COG `/vsicurl/`), `computeSpectralIndex`
-(NDVI/NDWI/… + auto-style), `runDossier` (dossier territorial 1-clic),
+(NDVI/NDWI/… + auto-style), `computeRasterDifference` (détection de changement),
+`zonalStatistics` (stats par zone), `runDossier` (dossier territorial 1-clic),
 `segmentRasterWithSAM`, `forecastWeatherWithEarth2`, `exportProjectReport`,
 `runScript` (gardé), …
 
@@ -84,9 +85,12 @@ Re-valider à tout moment : `python scripts/validate_nvidia_models.py`
   raster distant COG via `addRemoteRaster` (`/vsicurl/`, P3-S2).
 - **P2 — Dossier territorial 1-clic** (`dossier_blueprint.py` + `runDossier`) : urbanisme,
   risques, forêt, environnement → charge les couches + symbologies en un appel.
-- **P1 — Diagnostic satellite** (`spectral_indices.py` + `raster_style.py` +
-  `computeSpectralIndex`) : NDVI/NDWI/NDBI/NBR/EVI via `QgsRasterCalculator`, auto-stylé
-  pseudocolor. Bandes mappées `couche@N` (assets COG Sentinel B04/B08…).
+- **P1 — Diagnostic satellite** (`spectral_indices.py` + `raster_style.py`) :
+  `computeSpectralIndex` (NDVI/NDWI/NDBI/NBR/EVI via `QgsRasterCalculator`, auto-stylé) ·
+  `computeRasterDifference` (détection de changement, ΔNDVI multi-dates) ·
+  `zonalStatistics` (mean/min/max/count d'un raster par polygone, ex NDVI/parcelle).
+  Bandes mappées `couche@N` (assets COG Sentinel B04/B08…).
+- **Données vecteur** : catalogue WFS (IGN communes/RPG/cadastre) chargeables via `addDataSource`.
 - **Symbologies institutionnelles FR** (`symbology_presets.py`) : 13 presets (ONF, IGN,
   PLU, Cadastre, CLC, PPRi/PPRn, Natura 2000, TVB, BRGM, DCE…).
 

@@ -37,9 +37,9 @@ satellite, génère du PyQGIS — et exécute, le tout avec NVIDIA NIM au cœur.
 
 ### 🛠️ Agit dans QGIS (tool calling)
 - Lister / filtrer / styler / zoomer les couches
-- Reprojeter, calculer des statistiques
-- Appliquer une symbologie (.qml)
-- Générer et exécuter du PyQGIS (sécurisé)
+- Reprojeter, statistiques zonales (NDVI/parcelle)
+- **Diagnostic satellite** : NDVI/NDWI/… + détection de changement
+- Symbologies institutionnelles + génération PyQGIS sécurisée
 
 </td>
 </tr>
