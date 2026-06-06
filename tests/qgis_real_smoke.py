@@ -233,6 +233,33 @@ def main():
         except Exception as exc:
             rec("bridge.computeSpectralIndex", False, str(exc))
 
+        # Detection de changement (P1) : difference de deux rasters (dNDVI)
+        try:
+            import tempfile
+            from osgeo import gdal, osr
+
+            def _mk(path, val):
+                ds = gdal.GetDriverByName("GTiff").Create(path, 4, 4, 1, gdal.GDT_Float32)
+                ds.SetGeoTransform([600000, 10, 0, 6200000, 0, -10])
+                srs = osr.SpatialReference(); srs.ImportFromEPSG(2154)
+                ds.SetProjection(srs.ExportToWkt())
+                ds.GetRasterBand(1).Fill(val); ds.FlushCache()
+
+            t1 = os.path.join(tempfile.gettempdir(), "ndvi_t1.tif")
+            t2 = os.path.join(tempfile.gettempdir(), "ndvi_t2.tif")
+            _mk(t1, 0.2); _mk(t2, 0.6)
+            bridge.addRasterFile(t1, "ndvi_t1")
+            bridge.addRasterFile(t2, "ndvi_t2")
+            outd = os.path.join(tempfile.gettempdir(), "ndvi_diff.tif")
+            rawd = bridge.computeRasterDifference("ndvi_t2", "ndvi_t1", outd)
+            pd = json.loads(rawd) if rawd else {}
+            on = pd.get("outputLayerName", "")
+            created = bool(on) and bool(QgsProject.instance().mapLayersByName(on))
+            rec("bridge.computeRasterDifference", created,
+                f"out={on} expr={pd.get('expression')} style={pd.get('styled_with')}")
+        except Exception as exc:
+            rec("bridge.computeRasterDifference", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()

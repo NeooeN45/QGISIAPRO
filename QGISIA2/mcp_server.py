@@ -412,6 +412,24 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/computeSpectralIndex",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="computeRasterDifference",
+        description=(
+            "Difference de deux rasters mono-bande (ex: NDVI_t2 - NDVI_t1) pour la "
+            "detection de changement / le monitoring temporel. Auto-style diverging."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerA": {"type": "string", "description": "Raster recent (t2)"},
+                "layerB": {"type": "string", "description": "Raster ancien (t1)"},
+                "outputPath": {"type": "string"},
+            },
+            "required": ["layerA", "layerB"],
+        },
+        endpoint="/api/qgis/computeRasterDifference",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 

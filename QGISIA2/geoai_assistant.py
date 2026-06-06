@@ -1987,6 +1987,59 @@ class QgisBridge(BridgeQObject):
         return json.dumps(payload, ensure_ascii=False)
 
     @BridgeSlot(str, str, str, result=str)
+    def computeRasterDifference(self, layer_a, layer_b, output_path):
+        """Difference de deux rasters mono-bande (ex: NDVI_t2 - NDVI_t1) : detection de
+        changement / monitoring temporel. Auto-style diverging (P1)."""
+        try:
+            from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
+        except ImportError:
+            self._notify("QgsRasterCalculator indisponible.", Qgis.Critical)
+            return ""
+
+        la = self._ensure_raster_layer(str(layer_a or "").strip())
+        lb = self._ensure_raster_layer(str(layer_b or "").strip())
+        if la is None or lb is None:
+            self._notify("Deux rasters valides requis pour la difference.", Qgis.Warning)
+            return ""
+
+        ea = QgsRasterCalculatorEntry()
+        ea.ref = f"{la.name()}@1"; ea.raster = la; ea.bandNumber = 1
+        eb = QgsRasterCalculatorEntry()
+        eb.ref = f"{lb.name()}@1"; eb.raster = lb; eb.bandNumber = 1
+        expression = f'"{ea.ref}" - "{eb.ref}"'
+        output_name = f"DIFF_{la.name()}_{lb.name()}"
+        out_path = str(output_path or "").strip() or str(
+            self._runtime_directory() / f"{output_name}.tif")
+
+        calc = QgsRasterCalculator(
+            expression, out_path, "GTiff", la.extent(), la.width(), la.height(), [ea, eb])
+        if calc.processCalculation() != 0:
+            self._notify("Echec du calcul de difference raster.", Qgis.Critical)
+            return ""
+
+        out_rl = QgsRasterLayer(out_path, output_name)
+        if self._add_layer_to_project(out_rl, output_name, source="RasterDifference") is None:
+            self._notify("Difference calculee mais non chargeable.", Qgis.Warning)
+            return ""
+
+        payload = {"outputLayerName": out_rl.name(), "outputPath": out_path,
+                   "expression": expression}
+        try:
+            from raster_style import build_pseudocolor_qml, RAMPS
+        except ImportError:
+            from .raster_style import build_pseudocolor_qml, RAMPS
+        ramp = "thermal" if "thermal" in RAMPS else "greyscale"
+        try:
+            qml = build_pseudocolor_qml(ramp, -1.0, 1.0, band=1)
+            self.applyQmlStyle(out_rl.name(), qml)
+            payload["styled_with"] = ramp
+        except Exception as exc:  # noqa: BLE001
+            payload["style_error"] = str(exc)
+
+        self._notify(f"Difference raster creee : {out_rl.name()}.", Qgis.Success)
+        return json.dumps(payload, ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
             layer_ids = json.loads(layer_ids_json) if layer_ids_json else []
@@ -2844,6 +2897,13 @@ class ThreadedAssetServer:
                     body.get("layerId", ""),
                     body.get("indexId", ""),
                     band_map,
+                    body.get("outputPath", ""),
+                )
+            elif route == "/api/qgis/computeRasterDifference":
+                result = self._bridge_call(
+                    "computeRasterDifference",
+                    body.get("layerA", ""),
+                    body.get("layerB", ""),
                     body.get("outputPath", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
