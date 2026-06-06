@@ -278,6 +278,19 @@ def main():
         except Exception as exc:
             rec("bridge.zonalStatistics", False, str(exc))
 
+        # Analyse de proximite (buffer) : zone tampon autour des entites
+        try:
+            from qgis.core import QgsWkbTypes as _Wkb
+            raw_buf = bridge.bufferLayer("smoke_layer", "5", "smoke_buf")
+            pbuf = json.loads(raw_buf) if raw_buf else {}
+            blayers = QgsProject.instance().mapLayersByName("smoke_buf")
+            is_poly = bool(blayers) and blayers[0].geometryType() == _Wkb.PolygonGeometry
+            rec("bridge.bufferLayer",
+                pbuf.get("ok") is True and is_poly and pbuf.get("features", 0) >= 1,
+                f"features={pbuf.get('features')} poly={is_poly}")
+        except Exception as exc:
+            rec("bridge.bufferLayer", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()

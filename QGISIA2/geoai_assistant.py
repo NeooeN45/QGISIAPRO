@@ -2084,6 +2084,48 @@ class QgisBridge(BridgeQObject):
         }, ensure_ascii=False)
 
     @BridgeSlot(str, str, str, result=str)
+    def bufferLayer(self, layer_ref, distance, output_name):
+        """Cree une zone tampon (buffer) autour des entites d'une couche vectorielle.
+        Ex: 'buffer de 500m autour des ecoles'. Distance dans l'unite du CRS de la couche.
+        """
+        src = self._find_layer(str(layer_ref or "").strip())
+        if not isinstance(src, QgsVectorLayer):
+            self._notify("Couche vectorielle introuvable pour le buffer.", Qgis.Warning)
+            return ""
+        try:
+            dist = float(str(distance).replace(",", "."))
+        except ValueError:
+            self._notify("Distance de buffer invalide.", Qgis.Warning)
+            return ""
+
+        final_name = str(output_name or "").strip() or f"{src.name()}_buffer_{dist:g}"
+        crs_id = src.crs().authid() or "EPSG:4326"
+        buf = QgsVectorLayer(f"Polygon?crs={crs_id}", final_name, "memory")
+        buf.dataProvider().addAttributes(src.fields())
+        buf.updateFields()
+
+        out_feats = []
+        for feat in src.getFeatures():
+            geom = feat.geometry()
+            if geom is None or geom.isEmpty():
+                continue
+            nf = QgsFeature(buf.fields())
+            nf.setAttributes(feat.attributes())
+            nf.setGeometry(geom.buffer(dist, 12))
+            out_feats.append(nf)
+
+        buf.dataProvider().addFeatures(out_feats)
+        buf.updateExtents()
+        if self._add_layer_to_project(buf, final_name, source="Buffer") is None:
+            self._notify("Le buffer n'a pas pu etre charge.", Qgis.Warning)
+            return ""
+
+        message = f"Buffer cree : {final_name} ({len(out_feats)} entites, {dist:g} u)."
+        self._notify(message, Qgis.Success)
+        return json.dumps({"ok": True, "layer": final_name,
+                           "features": len(out_feats), "distance": dist}, ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
             layer_ids = json.loads(layer_ids_json) if layer_ids_json else []
@@ -2956,6 +2998,13 @@ class ThreadedAssetServer:
                     body.get("rasterId", ""),
                     body.get("polygonId", ""),
                     body.get("prefix", ""),
+                )
+            elif route == "/api/qgis/bufferLayer":
+                result = self._bridge_call(
+                    "bufferLayer",
+                    body.get("layerId", ""),
+                    str(body.get("distance", "0")),
+                    body.get("outputName", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(

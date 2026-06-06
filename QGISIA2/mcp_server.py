@@ -448,6 +448,24 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/zonalStatistics",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="bufferLayer",
+        description=(
+            "Creer une zone tampon (buffer) autour des entites d'une couche vectorielle "
+            "(ex: buffer de 500 m autour des ecoles). Distance dans l'unite du CRS."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "distance": {"type": "number"},
+                "outputName": {"type": "string"},
+            },
+            "required": ["layerId", "distance"],
+        },
+        endpoint="/api/qgis/bufferLayer",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 
