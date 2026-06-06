@@ -2915,6 +2915,41 @@ class ThreadedAssetServer:
                 self._send_json(handler, 200, {"ok": True, "result": result})
                 return True
 
+            if route == "/api/llm/agent":
+                # Boucle agentique tool-calling : LLM -> outils QGIS -> LLM -> reponse.
+                if not llm_installer.is_vendor_ready():
+                    self._send_json(handler, 503, {"ok": False, "error": "gateway_not_ready"})
+                    return True
+
+                messages = body.get("messages") or []
+                if not messages:
+                    query = body.get("query") or body.get("message") or ""
+                    if query:
+                        messages = [{"role": "user", "content": query}]
+                if not messages:
+                    self._send_json(handler, 400, {"ok": False, "error": "missing 'messages' or 'query'"})
+                    return True
+
+                api_keys = body.get("api_keys", {}) or {}
+                model = body.get("model", "smart-default")
+                max_iters = int(body.get("max_iters", 5))
+                # Le bridge QGIS est servi par ce meme serveur (multi-thread) : on
+                # route les appels d'outils vers notre propre hote.
+                host = handler.headers.get("Host", "127.0.0.1")
+                bridge_url = f"http://{host}"
+
+                try:
+                    from agent_tools import run_tool_loop
+                except ImportError:
+                    from .agent_tools import run_tool_loop
+
+                result = run_tool_loop(
+                    messages, api_keys,
+                    model=model, max_iters=max_iters, bridge_url=bridge_url,
+                )
+                self._send_json(handler, 200, {"ok": True, "result": result})
+                return True
+
             return False
         except Exception as exc:
             self._send_json(handler, 500, {

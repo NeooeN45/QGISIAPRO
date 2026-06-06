@@ -99,3 +99,69 @@ def test_execute_tool_call_unknown_tool_raises():
     import pytest
     with pytest.raises(ValueError):
         at.execute_tool_call("doesNotExist", {}, http_client=_FakeClient())
+
+
+def test_run_tool_loop_executes_tool_then_answers():
+    state = {"i": 0}
+
+    def fake_chat(model, messages, api_keys, tools=None, stream=False, **kw):
+        state["i"] += 1
+        if state["i"] == 1:
+            # 1er tour : le LLM demande l'outil zoomToLayer
+            return {"choices": [{"message": {
+                "content": None,
+                "tool_calls": [{
+                    "id": "c1",
+                    "function": {"name": "zoomToLayer", "arguments": '{"layerId": "L1"}'},
+                }],
+            }}]}
+        # 2e tour : le LLM repond apres avoir vu le resultat de l'outil
+        return {"choices": [{"message": {"content": "J'ai zoome sur la couche L1."}}]}
+
+    fake_http = _FakeClient("zoom ok")
+    res = at.run_tool_loop(
+        [{"role": "user", "content": "zoom sur L1"}],
+        api_keys={},
+        chat_fn=fake_chat,
+        http_client=fake_http,
+        bridge_url="http://localhost:8157",
+    )
+    assert "zoome" in res["content"]
+    assert res["iterations"] == 2
+    assert res["trace"][0]["tool"] == "zoomToLayer"
+    assert res["trace"][0]["arguments"] == {"layerId": "L1"}
+    assert res["trace"][0]["result"] == "zoom ok"
+
+
+def test_run_tool_loop_no_tools_returns_directly():
+    def fake_chat(model, messages, api_keys, tools=None, stream=False, **kw):
+        return {"choices": [{"message": {"content": "Reponse directe sans outil."}}]}
+
+    res = at.run_tool_loop(
+        [{"role": "user", "content": "bonjour"}],
+        api_keys={},
+        chat_fn=fake_chat,
+    )
+    assert res["content"] == "Reponse directe sans outil."
+    assert res["iterations"] == 1
+    assert res["trace"] == []
+
+
+def test_run_tool_loop_respects_max_iters():
+    def always_calls(model, messages, api_keys, tools=None, stream=False, **kw):
+        return {"choices": [{"message": {
+            "content": None,
+            "tool_calls": [{
+                "id": "c", "function": {"name": "getLayersList", "arguments": "{}"},
+            }],
+        }}]}
+
+    res = at.run_tool_loop(
+        [{"role": "user", "content": "boucle"}],
+        api_keys={},
+        chat_fn=always_calls,
+        http_client=_FakeClient("[]"),
+        max_iters=3,
+    )
+    assert res["iterations"] == 3
+    assert "Limite" in res["content"]
