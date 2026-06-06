@@ -128,6 +128,44 @@ def main():
         except Exception as exc:
             rec("bridge.applyQmlStyle", False, str(exc))
 
+        # Symbologie institutionnelle FR (B-S1) : appliquer un preset ONF
+        try:
+            foret = QgsVectorLayer(
+                "Polygon?crs=EPSG:2154&field=essence:string", "foret_test", "memory")
+            fp = foret.dataProvider()
+            for ess in ("chene", "hetre", "sapin"):
+                feat = QgsFeature(foret.fields()); feat.setAttributes([ess])
+                feat.setGeometry(QgsGeometry.fromWkt("Polygon((0 0,10 0,10 10,0 10,0 0))"))
+                fp.addFeatures([feat])
+            foret.updateExtents()
+            QgsProject.instance().addMapLayer(foret)
+            preset_msg = bridge.applySymbologyPreset("foret_test", "onf-peuplements", "")
+            r2 = foret.renderer()
+            rtype2 = r2.type() if r2 is not None else ""
+            attr = r2.classAttribute() if rtype2 == "categorizedSymbol" else ""
+            rec("bridge.applySymbologyPreset", rtype2 == "categorizedSymbol" and attr == "essence",
+                f"{preset_msg} | renderer={rtype2} attr={attr}")
+        except Exception as exc:
+            rec("bridge.applySymbologyPreset", False, str(exc))
+
+        # Catalogue mondial (P3-S1) : charger des fonds depuis le catalogue
+        try:
+            before = len(QgsProject.instance().mapLayers())
+            msg_osm = bridge.addDataSource("osm-standard", "")
+            msg_esri = bridge.addDataSource("esri-world-imagery", "")
+            after = len(QgsProject.instance().mapLayers())
+            rec("bridge.addDataSource", after >= before + 2,
+                f"{msg_osm} | {msg_esri} | layers {before}->{after}")
+        except Exception as exc:
+            rec("bridge.addDataSource", False, str(exc))
+
+        # Source inconnue -> message d'erreur propre (pas d'exception)
+        try:
+            msg_unknown = bridge.addDataSource("source-inexistante", "")
+            rec("bridge.addDataSource.unknown", "inconnue" in msg_unknown.lower(), msg_unknown)
+        except Exception as exc:
+            rec("bridge.addDataSource.unknown", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()
