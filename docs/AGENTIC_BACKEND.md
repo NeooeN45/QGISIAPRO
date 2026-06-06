@@ -103,7 +103,8 @@ Vérifié en QGIS réel (renderer = `categorizedSymbol`).
 | `python -m pytest tests/` | 154 tests unitaires (gateway, fédération, tools, native, vision) |
 | `npm run test` | 66 tests front |
 | `python tests/manual/test_live_e2e.py` | e2e live contre NVIDIA (chat, routage, tool-calling, geo) |
-| `tests/_run_qgis.bat tests/qgis_real_smoke.py` | bridge PyQGIS réel dans QGIS |
+| `tests/_run_qgis.bat tests/qgis_real_smoke.py` | bridge PyQGIS réel dans QGIS (10/10) |
+| `tests/_run_qgis.bat tests/qgis_grandeur_nature_smoke.py` | **grandeur nature 4/4** : requêtes utilisateur NL → agent → QGIS réel |
 
 ## 9. Fichiers clés
 
