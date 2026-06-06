@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "description": "Symbologies institutionnelles francaises, applicables a la demande par l'agent. Chaque preset genere un renderer categorise QGIS (champ -> couleurs officielles).",
+  "presets": [
+    {
+      "id": "onf-peuplements",
+      "institution": "ONF",
+      "name": "Peuplements forestiers (ONF)",
+      "geometry": "polygon",
+      "field": "essence",
+      "source": "Norme ONF - cartographie forestiere publique",
+      "categories": [
+        {"value": "chene", "label": "Chenaie", "color": "#2E8B57"},
+        {"value": "hetre", "label": "Hetraie", "color": "#3CB371"},
+        {"value": "sapin", "label": "Sapiniere", "color": "#006400"},
+        {"value": "epicea", "label": "Epicea", "color": "#004D00"},
+        {"value": "pin_sylvestre", "label": "Pin sylvestre", "color": "#556B2F"},
+        {"value": "melange", "label": "Melange", "color": "#66CDAA"}
+      ]
+    },
+    {
+      "id": "ign-bdforet",
+      "institution": "IGN",
+      "name": "BD Foret v2 (formation vegetale)",
+      "geometry": "polygon",
+      "field": "type",
+      "source": "IGN BD Foret v2",
+      "categories": [
+        {"value": "feuillus", "label": "Feuillus", "color": "#6EB36E"},
+        {"value": "coniferes", "label": "Coniferes", "color": "#2E6B3E"},
+        {"value": "mixte", "label": "Mixte", "color": "#9DBF7A"},
+        {"value": "peupleraie", "label": "Peupleraie", "color": "#B7D98A"},
+        {"value": "lande", "label": "Lande", "color": "#D9C77A"},
+        {"value": "formation_herbacee", "label": "Formation herbacee", "color": "#E6E6A8"}
+      ]
+    },
+    {
+      "id": "plu-zonage",
+      "institution": "Urbanisme",
+      "name": "Zonage PLU (U / AU / A / N)",
+      "geometry": "polygon",
+      "field": "zonage",
+      "source": "Code de l'urbanisme - zonage PLU",
+      "categories": [
+        {"value": "U", "label": "Zone urbaine (U)", "color": "#EE8262"},
+        {"value": "AU", "label": "A urbaniser (AU)", "color": "#FFA500"},
+        {"value": "A", "label": "Agricole (A)", "color": "#FFFF66"},
+        {"value": "N", "label": "Naturelle (N)", "color": "#7CB342"}
+      ]
+    },
+    {
+      "id": "cadastre-dgfip",
+      "institution": "DGFiP / Cadastre",
+      "name": "Cadastre - nature du bati",
+      "geometry": "polygon",
+      "field": "nature",
+      "source": "PCI vecteur (cadastre.gouv.fr)",
+      "categories": [
+        {"value": "bati_dur", "label": "Bati en dur", "color": "#D9B38C"},
+        {"value": "bati_leger", "label": "Bati leger", "color": "#EAD9C2"},
+        {"value": "parcelle", "label": "Parcelle", "color": "#FBE9D0"}
+      ]
+    },
+    {
+      "id": "clc-occupation-sol",
+      "institution": "Corine Land Cover",
+      "name": "Occupation du sol (CLC niveau 1)",
+      "geometry": "polygon",
+      "field": "clc",
+      "source": "Corine Land Cover (couleurs officielles)",
+      "categories": [
+        {"value": "artificialise", "label": "Territoires artificialises", "color": "#E6004D"},
+        {"value": "agricole", "label": "Territoires agricoles", "color": "#FFFFA8"},
+        {"value": "foret_naturel", "label": "Forets et milieux semi-naturels", "color": "#80FF00"},
+        {"value": "zone_humide", "label": "Zones humides", "color": "#CCCCFF"},
+        {"value": "eau", "label": "Surfaces en eau", "color": "#00CCF2"}
+      ]
+    },
+    {
+      "id": "ppri-inondation",
+      "institution": "Risques (PPRi)",
+      "name": "Plan de prevention du risque inondation",
+      "geometry": "polygon",
+      "field": "alea",
+      "source": "PPRi - zonage reglementaire",
+      "categories": [
+        {"value": "rouge", "label": "Alea fort (zone rouge)", "color": "#E31A1C"},
+        {"value": "bleu", "label": "Alea modere (zone bleue)", "color": "#1F78B4"},
+        {"value": "blanc", "label": "Alea faible / non reglemente", "color": "#F0F0F0"}
+      ]
+    },
+    {
+      "id": "natura2000",
+      "institution": "Environnement",
+      "name": "Zonages Natura 2000 / ZNIEFF",
+      "geometry": "polygon",
+      "field": "type_zonage",
+      "source": "INPN - zonages environnementaux",
+      "categories": [
+        {"value": "zps", "label": "ZPS (Directive Oiseaux)", "color": "#1B7837"},
+        {"value": "zsc", "label": "ZSC (Directive Habitats)", "color": "#5AAE61"},
+        {"value": "znieff1", "label": "ZNIEFF type 1", "color": "#A6DBA0"},
+        {"value": "znieff2", "label": "ZNIEFF type 2", "color": "#D9F0D3"}
+      ]
+    }
+  ]
+}

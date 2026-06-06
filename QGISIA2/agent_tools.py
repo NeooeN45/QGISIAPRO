@@ -160,7 +160,7 @@ def run_tool_loop(
     api_keys: dict,
     *,
     model: str = "smart-default",
-    max_iters: int = 5,
+    max_iters: int = 30,
     auto_mode: bool = False,
     system: Optional[str] = None,
     bridge_url: str = DEFAULT_BRIDGE_URL,

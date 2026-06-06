@@ -1583,6 +1583,48 @@ class QgisBridge(BridgeQObject):
             return message
 
     @BridgeSlot(str, str, str, result=str)
+    def applySymbologyPreset(self, layer_ref, preset_id, field):
+        """Applique une symbologie institutionnelle francaise (preset) a une couche.
+
+        Les presets (ONF, IGN, PLU, Cadastre, Corine, PPRi...) sont definis dans
+        config/symbology_presets.json et convertis en renderer categorise QGIS.
+        """
+        layer = self._find_layer(layer_ref)
+        if not isinstance(layer, QgsVectorLayer):
+            message = "Couche vectorielle introuvable pour le preset."
+            self._notify(message, Qgis.Warning)
+            return message
+        try:
+            try:
+                from symbology_presets import preset_to_qml, get_preset
+            except ImportError:
+                from .symbology_presets import preset_to_qml, get_preset
+            if get_preset(preset_id) is None:
+                message = f"Preset de symbologie inconnu: {preset_id}"
+                self._notify(message, Qgis.Warning)
+                return message
+            qml = preset_to_qml(preset_id, field=(field or None))
+            from qgis.PyQt.QtXml import QDomDocument
+            doc = QDomDocument()
+            if not doc.setContent(qml):
+                message = "QML du preset invalide."
+                self._notify(message, Qgis.Warning)
+                return message
+            ok, err = layer.importNamedStyle(doc)
+            if not ok:
+                message = f"Echec application preset: {err}"
+                self._notify(message, Qgis.Warning)
+                return message
+            self._refresh_layer_rendering(layer)
+            message = f"Symbologie '{preset_id}' appliquee sur {layer.name()}."
+            self._notify(message, Qgis.Success)
+            return message
+        except Exception as exc:  # noqa: BLE001
+            message = f"Erreur application preset: {exc}"
+            self._notify(message, Qgis.Warning)
+            return message
+
+    @BridgeSlot(str, str, str, result=str)
     def splitSelectedLayerByLine(self, layer_ref, line_wkt, output_name):
         layer = self._find_layer(layer_ref)
         if not isinstance(layer, QgsVectorLayer):
@@ -2569,6 +2611,13 @@ class ThreadedAssetServer:
                     body.get("layerId", ""),
                     body.get("qml", ""),
                 )
+            elif route == "/api/qgis/applySymbologyPreset":
+                result = self._bridge_call(
+                    "applySymbologyPreset",
+                    body.get("layerId", ""),
+                    body.get("presetId", ""),
+                    body.get("field", ""),
+                )
             elif route == "/api/qgis/splitSelectedLayerByLine":
                 result = self._bridge_call(
                     "splitSelectedLayerByLine",
@@ -2970,7 +3019,8 @@ class ThreadedAssetServer:
 
                 api_keys = body.get("api_keys", {}) or {}
                 model = body.get("model", "smart-default")
-                max_iters = int(body.get("max_iters", 5))
+                # Autonomie multi-etapes : defaut genereux, plafond dur a 100.
+                max_iters = min(int(body.get("max_iters", 30)), 100)
                 auto_mode = bool(body.get("auto_mode", False))
                 system = body.get("system")
                 # Le bridge QGIS est servi par ce meme serveur (multi-thread) : on

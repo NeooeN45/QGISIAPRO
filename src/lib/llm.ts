@@ -755,7 +755,7 @@ async function generateViaAgent(
       // Prompt complet : message utilisateur + contexte couches + documents joints.
       query: input.prompt,
       model: gateway.defaultAlias,
-      max_iters: 5,
+      max_iters: 40,
       auto_mode: gateway.autoMode,
       api_keys: gateway.apiKeys,
       signal: input.signal,

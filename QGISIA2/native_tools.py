@@ -110,6 +110,14 @@ def _search_satellite(args: dict, get_json: Callable) -> dict:
     return {"collection": collection, "count": len(items), "items": items}
 
 
+def _list_symbology_presets(args: dict, get_json: Callable) -> dict:
+    try:
+        from symbology_presets import list_presets  # type: ignore
+    except ImportError:
+        from .symbology_presets import list_presets  # type: ignore
+    return {"presets": list_presets()}
+
+
 def _generate_layer_style(args: dict, get_json: Callable) -> dict:
     """Genere un style QGIS (.qml) a partir d'une legende [{label,color,geometry}]."""
     try:
@@ -207,6 +215,17 @@ NATIVE_TOOLS: List[NativeTool] = [
             "required": ["bbox"],
         },
         executor=_search_satellite,
+    ),
+    NativeTool(
+        name="list_symbology_presets",
+        description=(
+            "Lister les symbologies institutionnelles francaises disponibles (ONF, "
+            "IGN BD Foret, PLU, Cadastre, Corine Land Cover, PPRi, Natura 2000). "
+            "Renvoie id, institution, champ attendu et nb de categories. A enchainer "
+            "avec applySymbologyPreset pour appliquer."
+        ),
+        input_schema={"type": "object", "properties": {}},
+        executor=_list_symbology_presets,
     ),
     NativeTool(
         name="generate_layer_style",

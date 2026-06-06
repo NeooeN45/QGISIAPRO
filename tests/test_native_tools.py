@@ -111,7 +111,7 @@ def test_to_openai_tools_and_names():
     names = nt.native_tool_names()
     assert set(names) == {
         "geocode", "weather", "elevation", "search_satellite_imagery",
-        "wikipedia", "generate_layer_style"}
+        "wikipedia", "generate_layer_style", "list_symbology_presets"}
     for t in tools:
         assert t["type"] == "function"
         assert t["function"]["parameters"]["type"] == "object"

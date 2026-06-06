@@ -298,6 +298,26 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/applyQmlStyle",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="applySymbologyPreset",
+        description=(
+            "Appliquer une symbologie institutionnelle francaise (preset) a une couche : "
+            "ONF, IGN BD Foret, PLU, Cadastre, Corine Land Cover, PPRi, Natura 2000. "
+            "Voir list_symbology_presets pour les id disponibles. 'field' surcharge le "
+            "champ a categoriser (defaut = champ du preset)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "presetId": {"type": "string", "description": "ex: 'onf-peuplements', 'plu-zonage'"},
+                "field": {"type": "string", "description": "Champ a categoriser (optionnel)"},
+            },
+            "required": ["layerId", "presetId"],
+        },
+        endpoint="/api/qgis/applySymbologyPreset",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 

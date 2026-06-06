@@ -104,8 +104,10 @@ def legend_to_qml(legend: List[dict], field: str = "classe",
     for i, item in enumerate(legend):
         color = hex_to_qgis_color(item["color"])
         label = escape(item["label"])
+        # 'value' = valeur du champ a matcher (presets) ; defaut = label (vision).
+        value = escape(str(item.get("value", item["label"])))
         categories.append(
-            f'<category value="{label}" symbol="{i}" label="{label}" render="true"/>')
+            f'<category value="{value}" symbol="{i}" label="{label}" render="true"/>')
         symbols.append(_symbol_xml(i, item.get("geometry", geom), color))
     return (
         '<!DOCTYPE qgis>\n'
