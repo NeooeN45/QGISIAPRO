@@ -1890,6 +1890,60 @@ class QgisBridge(BridgeQObject):
         self._notify(f"Raster calculé créé : {payload['outputLayerName']}.", Qgis.Success)
         return json.dumps(payload, ensure_ascii=False)
 
+    @BridgeSlot(str, str, str, str, result=str)
+    def computeSpectralIndex(self, layer_ref, index_id, band_map_json, output_path):
+        """Calcule un indice spectral (NDVI/NDWI/NDBI/NBR/EVI) sur un raster multibande
+        et applique automatiquement une rampe pseudocolor (P1 - diagnostic satellite).
+
+        band_map_json : {"NIR": "couche@8", "RED": "couche@4", ...} (refs QgsRasterCalculator).
+        """
+        try:
+            from spectral_indices import build_expression
+        except ImportError:
+            from .spectral_indices import build_expression
+
+        index_id = str(index_id or "").strip().lower()
+        try:
+            band_map = json.loads(band_map_json) if band_map_json else {}
+        except json.JSONDecodeError:
+            band_map = {}
+        if not isinstance(band_map, dict) or not band_map:
+            msg = 'band_map requis, ex: {"NIR":"couche@2","RED":"couche@1"}.'
+            self._notify(msg, Qgis.Warning)
+            return ""
+
+        try:
+            expression = build_expression(index_id, band_map)
+        except ValueError as exc:
+            self._notify(str(exc), Qgis.Warning)
+            return ""
+
+        output_name = f"{index_id.upper()}_{layer_ref}"
+        raw = self.calculateRasterFormula(
+            json.dumps([layer_ref]), expression, output_name, output_path)
+        if not raw:
+            return ""  # erreur deja notifiee par calculateRasterFormula
+
+        payload = json.loads(raw)
+        out_layer = payload.get("outputLayerName", output_name)
+
+        # Auto-stylage pseudocolor selon l'indice (plage -1..1 typique des indices normalises)
+        try:
+            from raster_style import build_pseudocolor_qml, RAMPS
+        except ImportError:
+            from .raster_style import build_pseudocolor_qml, RAMPS
+        ramp = index_id if index_id in RAMPS else "greyscale"
+        try:
+            qml = build_pseudocolor_qml(ramp, -1.0, 1.0, band=1)
+            self.applyQmlStyle(out_layer, qml)
+            payload["styled_with"] = ramp
+        except Exception as exc:  # noqa: BLE001 - le calcul a reussi, le style est best-effort
+            payload["style_error"] = str(exc)
+
+        payload["index"] = index_id
+        payload["expression"] = expression
+        return json.dumps(payload, ensure_ascii=False)
+
     @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
@@ -2737,6 +2791,17 @@ class ThreadedAssetServer:
                     body.get("layerIds", "[]"),
                     body.get("formula", ""),
                     body.get("outputName", ""),
+                    body.get("outputPath", ""),
+                )
+            elif route == "/api/qgis/computeSpectralIndex":
+                band_map = body.get("bandMap", "{}")
+                if isinstance(band_map, (dict, list)):
+                    band_map = json.dumps(band_map)
+                result = self._bridge_call(
+                    "computeSpectralIndex",
+                    body.get("layerId", ""),
+                    body.get("indexId", ""),
+                    band_map,
                     body.get("outputPath", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":

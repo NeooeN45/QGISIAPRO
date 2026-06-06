@@ -391,6 +391,27 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/runDossier",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="computeSpectralIndex",
+        description=(
+            "Calculer un indice spectral (ndvi, ndwi, ndbi, nbr, evi) sur un raster "
+            "multibande (Sentinel/Landsat) et le styliser automatiquement. 'bandMap' "
+            "mappe les bandes vers les refs QgsRasterCalculator (ex: {\"NIR\":\"couche@8\","
+            "\"RED\":\"couche@4\"})."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "indexId": {"type": "string", "enum": ["ndvi", "ndwi", "ndbi", "nbr", "evi"]},
+                "bandMap": {"type": "object"},
+                "outputPath": {"type": "string"},
+            },
+            "required": ["layerId", "indexId", "bandMap"],
+        },
+        endpoint="/api/qgis/computeSpectralIndex",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 
