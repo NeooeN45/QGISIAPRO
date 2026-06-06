@@ -106,6 +106,8 @@ def _search_satellite(args: dict, get_json: Callable) -> dict:
             "datetime": props.get("datetime"),
             "cloud_cover": props.get("eo:cloud_cover"),
             "thumbnail": (assets.get("thumbnail", {}) or {}).get("href"),
+            "visual": (assets.get("visual", {}) or {}).get("href"),
+            "asset_keys": list(assets.keys()),
         })
     return {"collection": collection, "count": len(items), "items": items}
 

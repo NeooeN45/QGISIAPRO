@@ -1175,6 +1175,38 @@ class QgisBridge(BridgeQObject):
         return message
 
     @BridgeSlot(str, str, result=str)
+    def addRemoteRaster(self, url, layer_name):
+        """Charge un raster distant (COG https, S3) dans QGIS via GDAL /vsicurl/.
+
+        Permet d'amener une image satellite (Sentinel/Landsat trouvee via
+        search_satellite_imagery) directement dans le projet (P3-S2).
+        """
+        url = str(url or "").strip()
+        if not url:
+            message = "URL de raster distante vide."
+            self._notify(message, Qgis.Warning)
+            return message
+        try:
+            from raster_remote import to_gdal_remote_path
+        except ImportError:
+            from .raster_remote import to_gdal_remote_path
+        gdal_path = to_gdal_remote_path(url)
+        final_name = str(layer_name or "").strip() or "Raster distant"
+        layer = QgsRasterLayer(gdal_path, final_name)
+        if not layer.isValid():
+            reason = self._layer_error_message(layer) or url
+            message = f"Raster distant invalide : {reason}"
+            self._notify(message, Qgis.Warning, duration=6)
+            return message
+        if self._add_layer_to_project(layer, final_name, source=f"RemoteRaster:{url}") is None:
+            message = "Le raster distant n'a pas pu etre charge."
+            self._notify(message, Qgis.Warning, duration=6)
+            return message
+        message = f"Raster distant charge : {final_name}."
+        self._notify(message, Qgis.Success)
+        return message
+
+    @BridgeSlot(str, str, result=str)
     def addGeoJsonLayer(self, geojson_text, layer_name):
         geojson_text = str(geojson_text or "").strip()
         if not geojson_text:
@@ -2607,6 +2639,12 @@ class ThreadedAssetServer:
                 result = self._bridge_call(
                     "addRasterFile",
                     body.get("filePath", ""),
+                    body.get("layerName", ""),
+                )
+            elif route == "/api/qgis/addRemoteRaster":
+                result = self._bridge_call(
+                    "addRemoteRaster",
+                    body.get("url", ""),
                     body.get("layerName", ""),
                 )
             elif route == "/api/qgis/addGeoJsonLayer":

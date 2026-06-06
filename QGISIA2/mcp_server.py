@@ -349,6 +349,23 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/addDataSource",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="addRemoteRaster",
+        description=(
+            "Charger un raster distant (COG https/S3) dans QGIS, ex: une image satellite "
+            "Sentinel/Landsat trouvee via search_satellite_imagery (href d'asset .tif)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL du COG (https://....tif) ou s3://..."},
+                "layerName": {"type": "string"},
+            },
+            "required": ["url"],
+        },
+        endpoint="/api/qgis/addRemoteRaster",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 

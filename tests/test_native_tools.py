@@ -84,6 +84,21 @@ def test_search_satellite_accepts_bbox_list():
     assert captured["bbox"] == "1.3,43.5,1.5,43.7"
 
 
+def test_search_satellite_exposes_visual_and_asset_keys():
+    def fake_get(url, params, timeout=20):
+        return {"features": [
+            {"id": "S2_Y", "properties": {"datetime": "2025-07-01T10:00:00Z"},
+             "assets": {"visual": {"href": "https://cog/visual.tif"},
+                        "B04": {"href": "https://cog/b04.tif"},
+                        "thumbnail": {"href": "https://img/t.jpg"}}},
+        ]}
+
+    out = nt._search_satellite({"bbox": "1,2,3,4"}, fake_get)
+    item = out["items"][0]
+    assert item["visual"] == "https://cog/visual.tif"
+    assert "B04" in item["asset_keys"] and "visual" in item["asset_keys"]
+
+
 def test_wikipedia_parses_summary():
     def fake_get(url, params, timeout=20):
         assert "wikipedia" in url
