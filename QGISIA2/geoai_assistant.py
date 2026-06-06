@@ -3863,9 +3863,20 @@ class ThreadedAssetServer:
                 layout_meta = body.get("layout_meta") or {}
                 model = body.get("model") or "nvidia_nim/meta/llama-3.2-90b-vision-instruct"
 
+                tmp_base = os.path.realpath(tempfile.gettempdir())
                 image_path = body.get("imagePath")
-                if not image_path:
-                    image_path = os.path.join(tempfile.gettempdir(), "critique_view.png")
+                if image_path:
+                    # Securite : un chemin fourni par le client doit etre un PNG/JPG situe
+                    # dans le repertoire temporaire (pas de path traversal ni de symlink).
+                    real = os.path.realpath(image_path)
+                    if (not (real == tmp_base or real.startswith(tmp_base + os.sep))
+                            or os.path.splitext(real)[1].lower() not in (".png", ".jpg", ".jpeg")
+                            or os.path.islink(image_path)):
+                        self._send_json(handler, 400, {"ok": False, "error": "invalid_image_path"})
+                        return True
+                    image_path = real
+                else:
+                    image_path = os.path.join(tmp_base, "critique_view.png")
                     self._bridge_call("renderMapView", image_path,
                                       str(body.get("width", "")), str(body.get("height", "")))
                 if not image_path or not os.path.exists(image_path):
