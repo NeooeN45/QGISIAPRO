@@ -63,6 +63,11 @@ def _options_payload(args: dict[str, Any]) -> dict[str, Any]:
     return {"options": json.dumps(args)}
 
 
+def _direct_payload(args: dict[str, Any]) -> dict[str, Any]:
+    """Endpoints de mutation carto : les champs sont lus directement dans le body."""
+    return dict(args)
+
+
 TOOL_CATALOG: list[McpToolSpec] = [
     McpToolSpec(
         name="loadHubEauStations",
@@ -208,6 +213,73 @@ TOOL_CATALOG: list[McpToolSpec] = [
         },
         endpoint="/api/qgis/runScript",
         payload_builder=lambda args: {"script": args.get("script", "")},
+    ),
+    McpToolSpec(
+        name="setLayerVisibility",
+        description="Afficher ou masquer une couche du projet QGIS.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "visible": {"type": "boolean", "default": True},
+            },
+            "required": ["layerId", "visible"],
+        },
+        endpoint="/api/qgis/setLayerVisibility",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="setLayerOpacity",
+        description="Regler l'opacite d'une couche (0.0 transparent a 1.0 opaque).",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "opacity": {"type": "number", "minimum": 0, "maximum": 1},
+            },
+            "required": ["layerId", "opacity"],
+        },
+        endpoint="/api/qgis/setLayerOpacity",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="zoomToLayer",
+        description="Zoomer le canvas sur l'emprise d'une couche.",
+        input_schema={
+            "type": "object",
+            "properties": {"layerId": {"type": "string"}},
+            "required": ["layerId"],
+        },
+        endpoint="/api/qgis/zoomToLayer",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="filterLayer",
+        description="Appliquer un filtre attributaire (subset string SQL) sur une couche vectorielle.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "subsetString": {"type": "string", "description": "Expression SQL, ex: \"type = 'foret'\""},
+            },
+            "required": ["layerId", "subsetString"],
+        },
+        endpoint="/api/qgis/filterLayer",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="reprojectLayer",
+        description="Reprojeter une couche vers un CRS cible (ex: 'EPSG:2154').",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "targetCrs": {"type": "string", "description": "Code EPSG, ex: 'EPSG:2154'"},
+            },
+            "required": ["layerId", "targetCrs"],
+        },
+        endpoint="/api/qgis/reprojectLayer",
+        payload_builder=_direct_payload,
     ),
 ]
 
