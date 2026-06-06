@@ -96,11 +96,22 @@ def test_wikipedia_parses_summary():
     assert out["url"].endswith("/Toulouse")
 
 
+def test_generate_layer_style_returns_qml():
+    out = nt._generate_layer_style(
+        {"legend": [{"label": "Foret", "color": "#228B22", "geometry": "polygon"}],
+         "field": "occ"}, None)
+    assert out["categories"] == 1
+    assert out["field"] == "occ"
+    assert "categorizedSymbol" in out["qml"]
+    assert "34,139,34,255" in out["qml"]
+
+
 def test_to_openai_tools_and_names():
     tools = nt.to_openai_tools()
     names = nt.native_tool_names()
     assert set(names) == {
-        "geocode", "weather", "elevation", "search_satellite_imagery", "wikipedia"}
+        "geocode", "weather", "elevation", "search_satellite_imagery",
+        "wikipedia", "generate_layer_style"}
     for t in tools:
         assert t["type"] == "function"
         assert t["function"]["parameters"]["type"] == "object"

@@ -110,6 +110,19 @@ def _search_satellite(args: dict, get_json: Callable) -> dict:
     return {"collection": collection, "count": len(items), "items": items}
 
 
+def _generate_layer_style(args: dict, get_json: Callable) -> dict:
+    """Genere un style QGIS (.qml) a partir d'une legende [{label,color,geometry}]."""
+    try:
+        from map_repro import legend_to_qml  # type: ignore
+    except ImportError:
+        from .map_repro import legend_to_qml  # type: ignore
+    legend = args.get("legend") or []
+    field = args.get("field", "classe")
+    geometry = args.get("geometry")
+    qml = legend_to_qml(legend, field=field, geometry=geometry)
+    return {"qml": qml, "categories": len(legend), "field": field}
+
+
 def _wikipedia(args: dict, get_json: Callable) -> dict:
     title = args.get("query") or args.get("title") or ""
     data = get_json(WIKIPEDIA_SUMMARY + urllib.parse.quote(title), {})
@@ -194,6 +207,35 @@ NATIVE_TOOLS: List[NativeTool] = [
             "required": ["bbox"],
         },
         executor=_search_satellite,
+    ),
+    NativeTool(
+        name="generate_layer_style",
+        description=(
+            "Generer un style QGIS (.qml categorise) a partir d'une legende. "
+            "A enchainer avec applyQmlStyle pour reproduire la symbologie d'une carte. "
+            "Chaque entree de legende: {label, color (hex), geometry (polygon|line|point)}."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "legend": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "color": {"type": "string"},
+                            "geometry": {"type": "string"},
+                        },
+                        "required": ["label", "color"],
+                    },
+                },
+                "field": {"type": "string", "default": "classe"},
+                "geometry": {"type": "string"},
+            },
+            "required": ["legend"],
+        },
+        executor=_generate_layer_style,
     ),
     NativeTool(
         name="wikipedia",
