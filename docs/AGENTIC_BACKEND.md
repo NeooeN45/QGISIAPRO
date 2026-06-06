@@ -64,8 +64,9 @@ Re-valider à tout moment : `python scripts/validate_nvidia_models.py`
 `addDataSource`, `addRemoteRaster` (COG `/vsicurl/`), `computeSpectralIndex`
 (NDVI/NDWI/… + auto-style), `computeRasterDifference` (détection de changement),
 `zonalStatistics` (stats par zone), `bufferLayer` (zone tampon),
-`classifyRaster` (classes thématiques), `loadSatelliteBands` (Sentinel réel via STAC),
-`renderMapView` (vue→PNG, boucle vision), `exportPrintLayout` (planche PNG/PDF, templates),
+`classifyRaster` (classes thématiques), `classifyChange` (sévérité dNDVI/dNBR),
+`loadSatelliteBands` (Sentinel réel via STAC), `renderMapView` (vue→PNG, boucle vision),
+`exportPrintLayout` (planche PNG/PDF, templates), `exportAtlas` (atlas PDF multi-pages),
 `saveVectorLayer` (export GPKG/GeoJSON/SHP), `runDossier` (dossier territorial 1-clic),
 `segmentRasterWithSAM`, `forecastWeatherWithEarth2`, `exportProjectReport`,
 `runScript` (gardé), …
