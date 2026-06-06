@@ -562,6 +562,25 @@ TOOL_CATALOG: list[McpToolSpec] = [
         payload_builder=_direct_payload,
     ),
     McpToolSpec(
+        name="exportAtlas",
+        description=(
+            "Generer un atlas PDF multi-pages (1 page par entite d'une couche de couverture). "
+            "atlasId optionnel ('communes_atlas','parcelles_atlas'); pageField nomme les pages."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "coverageId": {"type": "string", "description": "couche vecteur de couverture"},
+                "outputPath": {"type": "string"},
+                "atlasId": {"type": "string"},
+                "pageField": {"type": "string"},
+            },
+            "required": ["coverageId", "outputPath"],
+        },
+        endpoint="/api/qgis/exportAtlas",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
         name="renderMapView",
         description=(
             "Rendre la vue carte courante en image PNG (pour la boucle vision : faire "

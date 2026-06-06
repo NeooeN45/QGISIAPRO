@@ -2467,6 +2467,99 @@ class QgisBridge(BridgeQObject):
         return json.dumps({"ok": True, "layer": raster.name(), "scheme": scheme_id,
                            "classes": len(scheme["classes"])}, ensure_ascii=False)
 
+    @BridgeSlot(str, str, str, str, result=str)
+    def exportAtlas(self, coverage_ref, output_path, atlas_id, page_field):
+        """Genere un atlas PDF multi-pages (1 page par entite d'une couche de couverture).
+        atlas_id (optionnel) choisit le gabarit de base (voir atlas_specs.list_atlas)."""
+        from qgis.core import (
+            QgsPrintLayout, QgsLayoutItemMap, QgsLayoutItemLabel, QgsLayoutItemLegend,
+            QgsLayoutItemScaleBar, QgsLayoutPoint, QgsLayoutSize, QgsUnitTypes,
+            QgsLayoutExporter,
+        )
+        coverage = self._find_layer(str(coverage_ref or "").strip())
+        if not isinstance(coverage, QgsVectorLayer) or coverage.featureCount() == 0:
+            self._notify("Couche de couverture vectorielle (non vide) requise.", Qgis.Warning)
+            return ""
+        out = str(output_path or "").strip()
+        if not out:
+            self._notify("Chemin PDF de sortie requis.", Qgis.Warning)
+            return ""
+
+        page_size, orientation = "A4", "landscape"
+        try:
+            from atlas_specs import get_atlas
+            from layout_specs import get_template, page_dimensions_mm
+        except ImportError:
+            from .atlas_specs import get_atlas
+            from .layout_specs import get_template, page_dimensions_mm
+        atlas_meta = get_atlas(str(atlas_id or "").strip()) if atlas_id else None
+        base_layout = atlas_meta["base_layout"] if atlas_meta else "a4_paysage_pro"
+        tmpl = get_template(base_layout)
+        if tmpl:
+            page_size, orientation = tmpl["page_size"], tmpl["orientation"]
+
+        project = QgsProject.instance()
+        layout = QgsPrintLayout(project)
+        layout.initializeDefaults()
+        layout.setName(atlas_meta["name"] if atlas_meta else "Atlas QGISIA")
+        mm = QgsUnitTypes.LayoutMillimeters
+        w, h = page_dimensions_mm(page_size, orientation)
+        layout.pageCollection().pages()[0].setPageSize(QgsLayoutSize(w, h, mm))
+
+        m = QgsLayoutItemMap(layout)
+        m.attemptMove(QgsLayoutPoint(10, 18, mm))
+        m.attemptResize(QgsLayoutSize(w - 20, h - 30, mm))
+        m.setLayers(self.iface.mapCanvas().layers() or list(project.mapLayers().values()))
+        m.setExtent(coverage.extent())
+        m.setAtlasDriven(True)
+        m.setAtlasMargin(0.10)
+        m.setFrameEnabled(True)
+        layout.addLayoutItem(m)
+
+        label = QgsLayoutItemLabel(layout)
+        label.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        label.setText("[% @atlas_pagename %]")
+        label.attemptMove(QgsLayoutPoint(10, 6, mm))
+        label.attemptResize(QgsLayoutSize(w - 20, 10, mm))
+        layout.addLayoutItem(label)
+
+        legend = QgsLayoutItemLegend(layout)
+        legend.setLinkedMap(m)
+        legend.attemptMove(QgsLayoutPoint(w - 48, h - 52, mm))
+        layout.addLayoutItem(legend)
+
+        scalebar = QgsLayoutItemScaleBar(layout)
+        scalebar.setStyle("Single Box")
+        scalebar.setLinkedMap(m)
+        scalebar.applyDefaultSize()
+        scalebar.attemptMove(QgsLayoutPoint(10, h - 12, mm))
+        layout.addLayoutItem(scalebar)
+
+        atlas = layout.atlas()
+        atlas.setEnabled(True)
+        atlas.setCoverageLayer(coverage)
+        pf = str(page_field or "").strip()
+        if pf and coverage.fields().indexOf(pf) >= 0:
+            atlas.setPageNameExpression(f'"{pf}"')
+
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        exporter = QgsLayoutExporter(layout)
+        try:
+            res = exporter.exportToPdf(atlas, out, QgsLayoutExporter.PdfExportSettings())
+        except Exception as exc:  # noqa: BLE001
+            self._notify(f"Erreur export atlas : {exc}", Qgis.Critical)
+            return ""
+        code = res[0] if isinstance(res, (tuple, list)) else res
+        if code != QgsLayoutExporter.Success:
+            self._notify("Echec de l'export de l'atlas.", Qgis.Warning)
+            return ""
+
+        pages = coverage.featureCount()
+        self._notify(f"Atlas exporte : {Path(out).name} ({pages} pages).", Qgis.Success)
+        return json.dumps({"ok": True, "path": out, "pages": pages,
+                           "base_layout": base_layout,
+                           "atlas": atlas_id or None}, ensure_ascii=False)
+
     @BridgeSlot(str, str, str, result=str)
     def renderMapView(self, output_path, width, height):
         """Rend la vue carte courante en image PNG. Brique de la BOUCLE VISION : l'agent
@@ -3434,6 +3527,14 @@ class ThreadedAssetServer:
                     "classifyChange",
                     body.get("layerId", ""),
                     body.get("schemeId", ""),
+                )
+            elif route == "/api/qgis/exportAtlas":
+                result = self._bridge_call(
+                    "exportAtlas",
+                    body.get("coverageId", ""),
+                    body.get("outputPath", ""),
+                    body.get("atlasId", ""),
+                    body.get("pageField", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(

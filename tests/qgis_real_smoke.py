@@ -371,6 +371,21 @@ def main():
         except Exception as exc:
             rec("bridge.classifyChange", False, str(exc))
 
+        # Atlas PDF multi-pages (1 page par entite de couverture)
+        try:
+            import tempfile
+            pdf = os.path.join(tempfile.gettempdir(), "atlas_test.pdf")
+            if os.path.exists(pdf):
+                os.remove(pdf)
+            raw_at = bridge.exportAtlas("smoke_buf", pdf, "", "")
+            pat = json.loads(raw_at) if raw_at else {}
+            asize = os.path.getsize(pdf) if os.path.exists(pdf) else 0
+            rec("bridge.exportAtlas",
+                pat.get("ok") is True and asize > 1000 and pat.get("pages", 0) >= 1,
+                f"pages={pat.get('pages')} size={asize} base={pat.get('base_layout')}")
+        except Exception as exc:
+            rec("bridge.exportAtlas", False, str(exc))
+
         # Boucle vision : rendre la vue carte en image (pour critique VLM)
         try:
             import tempfile
