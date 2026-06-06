@@ -18,14 +18,17 @@ from typing import Any, Callable, List, Optional
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OPENMETEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
 OPENMETEO_ELEVATION = "https://api.open-meteo.com/v1/elevation"
+EARTH_SEARCH_STAC = "https://earth-search.aws.element84.com/v1/search"
+WIKIPEDIA_SUMMARY = "https://fr.wikipedia.org/api/rest_v1/page/summary/"
 
 _USER_AGENT = "QGISIA-Plus/3.4 (assistant SIG ; contact qgisai.plus@gmail.com)"
 
 
 def _default_get_json(url: str, params: dict, timeout: float = 20.0) -> Any:
     """GET JSON via la stdlib (pas de dependance externe). Respecte un User-Agent."""
-    query = urllib.parse.urlencode(params)
-    req = urllib.request.Request(f"{url}?{query}", headers={"User-Agent": _USER_AGENT})
+    query = urllib.parse.urlencode(params or {})
+    full = f"{url}?{query}" if query else url
+    req = urllib.request.Request(full, headers={"User-Agent": _USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (URLs fixes/https)
         return json.loads(resp.read().decode("utf-8"))
 
@@ -81,6 +84,43 @@ def _elevation(args: dict, get_json: Callable) -> dict:
             "elevation_m": elevations[0] if elevations else None}
 
 
+def _search_satellite(args: dict, get_json: Callable) -> dict:
+    collection = args.get("collection", "sentinel-2-l2a")
+    limit = int(args.get("limit", 5))
+    params = {"collections": collection, "limit": limit}
+    bbox = args.get("bbox")
+    if isinstance(bbox, (list, tuple)):
+        bbox = ",".join(str(x) for x in bbox)
+    if bbox:
+        params["bbox"] = bbox
+    if args.get("datetime"):
+        params["datetime"] = args["datetime"]
+    data = get_json(EARTH_SEARCH_STAC, params)
+    feats = (data or {}).get("features", []) or []
+    items = []
+    for f in feats[:limit]:
+        props = f.get("properties", {}) or {}
+        assets = f.get("assets", {}) or {}
+        items.append({
+            "id": f.get("id"),
+            "datetime": props.get("datetime"),
+            "cloud_cover": props.get("eo:cloud_cover"),
+            "thumbnail": (assets.get("thumbnail", {}) or {}).get("href"),
+        })
+    return {"collection": collection, "count": len(items), "items": items}
+
+
+def _wikipedia(args: dict, get_json: Callable) -> dict:
+    title = args.get("query") or args.get("title") or ""
+    data = get_json(WIKIPEDIA_SUMMARY + urllib.parse.quote(title), {})
+    urls = (data or {}).get("content_urls", {}) or {}
+    return {
+        "title": data.get("title"),
+        "extract": data.get("extract"),
+        "url": (urls.get("desktop", {}) or {}).get("page"),
+    }
+
+
 NATIVE_TOOLS: List[NativeTool] = [
     NativeTool(
         name="geocode",
@@ -124,6 +164,46 @@ NATIVE_TOOLS: List[NativeTool] = [
             "required": ["lat", "lon"],
         },
         executor=_elevation,
+    ),
+    NativeTool(
+        name="search_satellite_imagery",
+        description=(
+            "Rechercher des images satellite ouvertes via le catalogue STAC Earth "
+            "Search (sans cle). Collections: 'sentinel-2-l2a' (optique), "
+            "'sentinel-1-grd' (radar), 'landsat-c2-l2'. Filtrer par emprise (bbox) "
+            "et periode (datetime). Renvoie id, date, couverture nuageuse, apercu."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "collection": {
+                    "type": "string",
+                    "enum": ["sentinel-2-l2a", "sentinel-1-grd", "landsat-c2-l2"],
+                    "default": "sentinel-2-l2a",
+                },
+                "bbox": {
+                    "type": "string",
+                    "description": "Emprise 'minlon,minlat,maxlon,maxlat' (WGS84)",
+                },
+                "datetime": {
+                    "type": "string",
+                    "description": "Periode ISO, ex: '2025-06-01/2025-06-30'",
+                },
+                "limit": {"type": "integer", "default": 5},
+            },
+            "required": ["bbox"],
+        },
+        executor=_search_satellite,
+    ),
+    NativeTool(
+        name="wikipedia",
+        description="Rechercher un resume factuel sur Wikipedia (FR) pour ancrer une reponse.",
+        input_schema={
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "Sujet ou titre d'article"}},
+            "required": ["query"],
+        },
+        executor=_wikipedia,
     ),
 ]
 
