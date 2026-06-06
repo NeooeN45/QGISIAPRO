@@ -30,6 +30,28 @@ RAMPS = {
         (0.5, "#808080"),   # gris
         (1.0, "#FFFFFF"),   # blanc
     ],
+    "ndmi": [
+        (0.0, "#FFFFFF"),   # blanc (sec)
+        (0.5, "#87CEEB"),   # bleu clair (intermediaire)
+        (1.0, "#0000CD"),   # bleu (humide)
+    ],
+    "savi": [
+        (0.0, "#8B4513"),   # brun (sol nu)
+        (0.5, "#9ACD32"),   # vert jaune (intermediaire)
+        (1.0, "#006400"),   # vert fonce (vegetation)
+    ],
+    "rdylgn": [
+        (0.0, "#E31A1C"),   # rouge (faible)
+        (0.5, "#FFEDA0"),   # jaune (intermediaire)
+        (1.0, "#31A354"),   # vert (fort)
+    ],
+    "spectral": [
+        (0.0, "#8B00FF"),   # violet
+        (0.25, "#0000FF"),  # bleu
+        (0.5, "#00FF00"),   # vert
+        (0.75, "#FFFF00"),  # jaune
+        (1.0, "#FF0000"),   # rouge
+    ],
 }
 
 

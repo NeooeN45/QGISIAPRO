@@ -40,6 +40,21 @@ def test_build_pseudocolor_qml_unknown_raises():
         rs.build_pseudocolor_qml("inconnu", 0, 1)
 
 
+def test_list_ramps_contains_new_ones():
+    ids = set(rs.list_ramps())
+    assert {"ndmi", "savi", "rdylgn", "spectral"}.issubset(ids)
+
+
+def test_build_pseudocolor_qml_spectral():
+    qml = rs.build_pseudocolor_qml("spectral", 0.0, 1.0, band=1)
+    root = ET.fromstring(qml)
+    renderer = root.find("pipe/rasterrenderer")
+    assert renderer is not None
+    assert renderer.get("type") == "singlebandpseudocolor"
+    items = renderer.findall("rastershader/colorrampshader/item")
+    assert len(items) >= 5
+
+
 def test_all_ramps_generate_valid_xml():
     for rid in rs.list_ramps():
         qml = rs.build_pseudocolor_qml(rid, 0.0, 1.0, band=1)
