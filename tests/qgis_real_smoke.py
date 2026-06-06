@@ -350,6 +350,21 @@ def main():
         except Exception as exc:
             rec("bridge.classifyRaster", False, str(exc))
 
+        # Boucle vision : rendre la vue carte en image (pour critique VLM)
+        try:
+            import tempfile
+            view_png = os.path.join(tempfile.gettempdir(), "view_render.png")
+            if os.path.exists(view_png):
+                os.remove(view_png)
+            raw_rv = bridge.renderMapView(view_png, "800", "600")
+            prv = json.loads(raw_rv) if raw_rv else {}
+            vsize = os.path.getsize(view_png) if os.path.exists(view_png) else 0
+            rec("bridge.renderMapView",
+                prv.get("ok") is True and vsize > 1000,
+                f"path={prv.get('path')} size={vsize} {prv.get('width')}x{prv.get('height')}")
+        except Exception as exc:
+            rec("bridge.renderMapView", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()

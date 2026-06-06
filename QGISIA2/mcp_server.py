@@ -544,6 +544,24 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/classifyRaster",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="renderMapView",
+        description=(
+            "Rendre la vue carte courante en image PNG (pour la boucle vision : faire "
+            "critiquer le rendu par un VLM puis auto-corriger)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "outputPath": {"type": "string"},
+                "width": {"type": "integer"},
+                "height": {"type": "integer"},
+            },
+            "required": ["outputPath"],
+        },
+        endpoint="/api/qgis/renderMapView",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 

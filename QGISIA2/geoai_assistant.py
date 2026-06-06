@@ -2401,6 +2401,48 @@ class QgisBridge(BridgeQObject):
                           ensure_ascii=False)
 
     @BridgeSlot(str, str, str, result=str)
+    def renderMapView(self, output_path, width, height):
+        """Rend la vue carte courante en image PNG. Brique de la BOUCLE VISION : l'agent
+        envoie ensuite cette image a un VLM (NVIDIA) qui la critique pour auto-correction."""
+        from qgis.core import QgsMapRendererParallelJob
+        from qgis.PyQt.QtCore import QSize
+        out = str(output_path or "").strip()
+        if not out:
+            self._notify("Chemin de sortie requis.", Qgis.Warning)
+            return ""
+        canvas = self.iface.mapCanvas()
+        settings = canvas.mapSettings()
+
+        all_layers = canvas.layers() or list(QgsProject.instance().mapLayers().values())
+        if not settings.layers():
+            settings.setLayers(all_layers)
+        if settings.extent() is None or settings.extent().isEmpty():
+            if all_layers:
+                settings.setExtent(all_layers[0].extent())
+
+        try:
+            w = int(float(width)) if width else (canvas.width() or 1024)
+            h = int(float(height)) if height else (canvas.height() or 768)
+        except ValueError:
+            w, h = (canvas.width() or 1024), (canvas.height() or 768)
+        w = max(64, min(w, 4096))
+        h = max(64, min(h, 4096))
+        settings.setOutputSize(QSize(w, h))
+
+        job = QgsMapRendererParallelJob(settings)
+        job.start()
+        job.waitForFinished()
+        img = job.renderedImage()
+
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        if not img.save(out):
+            self._notify("Echec du rendu de la vue.", Qgis.Warning)
+            return ""
+        self._notify(f"Vue rendue : {Path(out).name} ({w}x{h}).", Qgis.Success)
+        return json.dumps({"ok": True, "path": out, "width": w, "height": h,
+                           "layers": len(all_layers)}, ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
             layer_ids = json.loads(layer_ids_json) if layer_ids_json else []
@@ -3312,6 +3354,13 @@ class ThreadedAssetServer:
                     "classifyRaster",
                     body.get("layerId", ""),
                     body.get("schemeId", ""),
+                )
+            elif route == "/api/qgis/renderMapView":
+                result = self._bridge_call(
+                    "renderMapView",
+                    body.get("outputPath", ""),
+                    str(body.get("width", "")),
+                    str(body.get("height", "")),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(
