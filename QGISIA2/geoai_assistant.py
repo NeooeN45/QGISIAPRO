@@ -3913,6 +3913,63 @@ class ThreadedAssetServer:
                 })
                 return True
 
+            if route == "/api/llm/autoImproveLayout":
+                # AUTO-AMELIORATION : choisit le gabarit le plus complet -> rend la planche
+                # -> critique VLM + score. Une iteration autonome de la boucle vision.
+                if not llm_installer.is_vendor_ready():
+                    self._send_json(handler, 503, {"ok": False, "error": "gateway_not_ready"})
+                    return True
+
+                api_keys = body.get("api_keys", {}) or {}
+                intent = body.get("intent", "") or "carte cartographique"
+                title = body.get("title", "") or "Carte QGISIA+"
+                model = body.get("model") or "nvidia_nim/meta/llama-3.2-90b-vision-instruct"
+                try:
+                    from layout_auto import pick_best_template
+                    from vision_critique import (
+                        build_critique_prompt, completeness_score, suggest_fixes)
+                except ImportError:
+                    from .layout_auto import pick_best_template
+                    from .vision_critique import (
+                        build_critique_prompt, completeness_score, suggest_fixes)
+
+                best = pick_best_template(prefer=body.get("prefer"))
+                out = os.path.join(os.path.realpath(tempfile.gettempdir()), "auto_layout.png")
+                raw = self._bridge_call(
+                    "exportPrintLayout", title, out, "png", best["template"] or "")
+                try:
+                    play = json.loads(raw) if raw else {}
+                except (ValueError, TypeError):
+                    play = {}
+                if not play.get("ok") or not os.path.exists(out):
+                    self._send_json(handler, 500, {
+                        "ok": False, "error": "export_failed", "chosen_template": best})
+                    return True
+
+                layout_meta = play.get("layout_meta") or {}
+                import base64
+                with open(out, "rb") as fh:
+                    b64 = base64.b64encode(fh.read()).decode("ascii")
+                prompt = build_critique_prompt(intent, layout_meta)
+                resp = llm_gateway.chat(
+                    model, llm_gateway.build_vision_messages(prompt, b64),
+                    api_keys=api_keys, max_tokens=int(body.get("max_tokens", 400)))
+                msg = (resp.get("choices") or [{}])[0].get("message", {})
+                critique = msg.get("content") or msg.get("reasoning_content") or ""
+                score = completeness_score(layout_meta)
+                self._send_json(handler, 200, {
+                    "ok": True,
+                    "chosen_template": best["template"],
+                    "score": score["score"],
+                    "missing": score["missing"],
+                    "fixes": suggest_fixes(layout_meta),
+                    "critique": critique,
+                    "model_used": resp.get("_gateway", {}).get("model_used"),
+                    "render_path": out,
+                    "layout_meta": layout_meta,
+                })
+                return True
+
             return False
         except Exception as exc:
             self._send_json(handler, 500, {
