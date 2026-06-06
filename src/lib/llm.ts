@@ -20,6 +20,7 @@ import { useGatewayStore } from "../stores/useGatewayStore";
 import {
   streamToText as gatewayStreamToText,
   smartProcess as gatewaySmartProcess,
+  runAgent as gatewayRunAgent,
   type ChatMessage,
 } from "./litellm-client";
 
@@ -728,6 +729,57 @@ async function generateViaFederation(
   }
 }
 
+/**
+ * Mode "Action" : boucle de tool-calling. Le LLM appelle des outils QGIS
+ * (lister/filtrer/zoomer/styler...) jusqu'a accomplir la demande, puis resume.
+ * Les actions destructives sont filtrees par les guardrails cote backend.
+ */
+async function generateViaAgent(
+  input: GenerateAssistantReplyInput,
+): Promise<string> {
+  const thinkingStore = useThinkingStore.getState();
+  const streamingStore = useStreamingStore.getState();
+  const gateway = useGatewayStore.getState().config;
+
+  try {
+    thinkingStore.setPhase("EXECUTING_TOOLS", {
+      message: "Agent SIG : exécution d'outils QGIS...",
+      subMessage: "Le modèle appelle les actions nécessaires",
+      modelName: gateway.defaultAlias,
+    });
+    streamingStore.startStreaming(createMessageId());
+
+    const result = await gatewayRunAgent({
+      query: input.latestUserMessage,
+      model: gateway.defaultAlias,
+      max_iters: 5,
+      auto_mode: gateway.autoMode,
+      api_keys: gateway.apiKeys,
+      signal: input.signal,
+    });
+
+    const toolsLine = result.trace.length
+      ? `🔧 Outils exécutés : ${result.trace.map((t) => t.tool).join(", ")}\n\n`
+      : "";
+    const full = toolsLine + (result.content || "Aucune réponse produite.");
+
+    const chunkSize = 12;
+    for (let i = 0; i < full.length; i += chunkSize) {
+      streamingStore.addChunk(full.slice(i, i + chunkSize));
+      await new Promise((r) => setTimeout(r, 2));
+    }
+    setTimeout(() => {
+      thinkingStore.reset();
+      streamingStore.completeStreaming();
+    }, 300);
+    return full;
+  } catch (error) {
+    thinkingStore.reset();
+    streamingStore.completeStreaming();
+    throw error;
+  }
+}
+
 async function generateViaGateway(
   input: GenerateAssistantReplyInput,
 ): Promise<string> {
@@ -735,6 +787,10 @@ async function generateViaGateway(
   const streamingStore = useStreamingStore.getState();
   const gateway = useGatewayStore.getState().config;
 
+  // Mode Action (tool-calling) prioritaire : l'agent agit sur QGIS.
+  if (gateway.agentMode) {
+    return generateViaAgent(input);
+  }
   // Mode SIG Intelligent : on delegue a la federation multi-agents.
   if (gateway.federationMode) {
     return generateViaFederation(input);

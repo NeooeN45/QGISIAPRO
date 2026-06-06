@@ -18,6 +18,7 @@ export interface GatewayConfig {
   useGateway: boolean;  // feature flag de migration
   autoMode: boolean;    // toggle Auto (Plan+Confirm sinon)
   federationMode: boolean; // SIG Intelligent : routage multi-agents (/api/llm/smart)
+  agentMode: boolean;   // Mode Action : boucle de tool-calling QGIS (/api/llm/agent)
   status: GatewayStatus;
   lastError?: string;
 }
@@ -30,6 +31,7 @@ const DEFAULT_CONFIG: GatewayConfig = {
   useGateway: false, // OFF par defaut — on bascule progressivement
   autoMode: false,   // Plan+Confirm par defaut (charte D1)
   federationMode: false, // OFF par defaut — mode mono-cerveau sinon
+  agentMode: false,      // OFF par defaut — chat simple sinon
   status: "unknown",
 };
 
@@ -93,6 +95,7 @@ interface GatewayStore {
   setUseGateway: (on: boolean) => void;
   setAutoMode: (on: boolean) => void;
   setFederationMode: (on: boolean) => void;
+  setAgentMode: (on: boolean) => void;
   setStatus: (status: GatewayStatus, error?: string) => void;
   hasAnyKey: () => boolean;
   getApiKeys: () => ApiKeys;
@@ -143,6 +146,13 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
   setFederationMode: (on) =>
     set((state) => {
       const config = { ...state.config, federationMode: on };
+      persistConfig(config);
+      return { config };
+    }),
+
+  setAgentMode: (on) =>
+    set((state) => {
+      const config = { ...state.config, agentMode: on };
       persistConfig(config);
       return { config };
     }),

@@ -97,6 +97,7 @@ export function GatewaySettingsPanel() {
   const setUseGateway = useGatewayStore((s) => s.setUseGateway);
   const setAutoMode = useGatewayStore((s) => s.setAutoMode);
   const setFederationMode = useGatewayStore((s) => s.setFederationMode);
+  const setAgentMode = useGatewayStore((s) => s.setAgentMode);
 
   const gw = useLLMGateway();
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -299,6 +300,13 @@ export function GatewaySettingsPanel() {
           checked={config.federationMode}
           onChange={setFederationMode}
           accent="indigo"
+        />
+        <ToggleCard
+          title="Mode Action (outils QGIS)"
+          description="L'agent appelle directement les outils QGIS (couches, filtres, zoom, style...). Actions destructives filtrées par la sécurité (Mode Auto pour les autoriser)."
+          checked={config.agentMode}
+          onChange={setAgentMode}
+          accent="amber"
         />
       </div>
 

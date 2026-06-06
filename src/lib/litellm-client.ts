@@ -293,6 +293,7 @@ export interface AgentRequest {
   messages?: ChatMessage[];
   model?: string;
   max_iters?: number;
+  auto_mode?: boolean;
   api_keys?: ApiKeys;
   signal?: AbortSignal;
 }
