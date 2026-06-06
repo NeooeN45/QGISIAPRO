@@ -60,16 +60,26 @@ Re-valider à tout moment : `python scripts/validate_nvidia_models.py`
 
 ### Outils QGIS (bridge, `mcp_server.py` → `/api/qgis/*`)
 `getLayersList`, `setLayerVisibility`, `setLayerOpacity`, `zoomToLayer`,
-`filterLayer`, `reprojectLayer`, `applyQmlStyle`, `segmentRasterWithSAM`,
-`forecastWeatherWithEarth2`, `exportProjectReport`, `runScript` (gardé), …
+`filterLayer`, `reprojectLayer`, `applyQmlStyle`, `applySymbologyPreset`,
+`addDataSource`, `segmentRasterWithSAM`, `forecastWeatherWithEarth2`,
+`exportProjectReport`, `runScript` (gardé), …
 
-### Outils natifs web/geo (`native_tools.py`, en-process, sans clé)
+### Outils natifs web/geo/data (`native_tools.py`, en-process, sans clé)
 | Outil | Source |
 |-------|--------|
 | `geocode` | OpenStreetMap / Nominatim |
 | `weather` / `elevation` | Open-Meteo (Copernicus DEM) |
 | `search_satellite_imagery` | STAC Earth Search (Sentinel-2/1, Landsat) |
 | `wikipedia` | Wikipedia FR |
+| `generate_layer_style` | Légende → QML (reproduction de carte) |
+| `list_symbology_presets` | Symbologies institutionnelles FR (ONF/IGN/PLU/Cadastre/CLC/PPRi) |
+| `list_data_sources` | **Catalogue mondial** (`data_catalog.py` / `config/data_sources.json`) |
+
+### Catalogue mondial de données (`data_catalog.py`, P3-S1)
+≈16 sources gratuites (XYZ/WMTS/WMS) : fonds OSM/CARTO/ESRI, satellite (ESRI imagery,
+Sentinel-2 cloudless EOX), relief, occupation du sol (ESA WorldCover), France
+(IGN Plan/Ortho/SCAN25, Cadastre). L'agent les découvre via `list_data_sources` et les
+charge via `addDataSource` (slot bridge → `_create_service_layer`). Vérifié en QGIS réel.
 
 Le même catalogue alimente **le tool-calling LLM** ET **le serveur MCP** (Claude
 Desktop, Cursor…) — source unique de vérité.
