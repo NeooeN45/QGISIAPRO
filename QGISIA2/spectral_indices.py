@@ -40,6 +40,30 @@ INDICES = {
         "formula": "2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))",
         "bands": ["NIR", "RED", "BLUE"],
     },
+    "savi": {
+        "name": "SAVI",
+        "description": "Soil Adjusted Vegetation Index",
+        "formula": "((NIR - RED) / (NIR + RED + 0.5)) * 1.5",
+        "bands": ["NIR", "RED"],
+    },
+    "msavi2": {
+        "name": "MSAVI2",
+        "description": "Modified Soil Adjusted Vegetation Index 2",
+        "formula": "(2 * NIR + 1 - sqrt((2 * NIR + 1)^2 - 8 * (NIR - RED))) / 2",
+        "bands": ["NIR", "RED"],
+    },
+    "ndmi": {
+        "name": "NDMI",
+        "description": "Normalized Difference Moisture Index",
+        "formula": "(NIR - SWIR) / (NIR + SWIR)",
+        "bands": ["NIR", "SWIR"],
+    },
+    "bsi": {
+        "name": "BSI",
+        "description": "Bare Soil Index",
+        "formula": "((SWIR + RED) - (NIR + BLUE)) / ((SWIR + RED) + (NIR + BLUE))",
+        "bands": ["SWIR", "RED", "NIR", "BLUE"],
+    },
 }
 
 

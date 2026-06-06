@@ -31,6 +31,16 @@ def test_build_expression_missing_band_raises():
         si.build_expression("ndvi", {"RED": "b4@1"})
 
 
+def test_list_indices_contains_new_ones():
+    ids = {i["id"] for i in si.list_indices()}
+    assert {"savi", "msavi2", "ndmi", "bsi"}.issubset(ids)
+
+
+def test_build_expression_ndmi():
+    expr = si.build_expression("ndmi", {"NIR": "b8@1", "SWIR": "b11@1"})
+    assert expr == "(b8@1 - b11@1) / (b8@1 + b11@1)"
+
+
 def test_sentinel2_band_map_has_five_keys():
     bm = si.sentinel2_band_map()
     assert set(bm.keys()) == {"BLUE", "GREEN", "RED", "NIR", "SWIR"}
