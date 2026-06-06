@@ -118,6 +118,15 @@ def _list_symbology_presets(args: dict, get_json: Callable) -> dict:
     return {"presets": list_presets()}
 
 
+def _list_data_sources(args: dict, get_json: Callable) -> dict:
+    try:
+        from data_catalog import list_sources  # type: ignore
+    except ImportError:
+        from .data_catalog import list_sources  # type: ignore
+    sources = list_sources(args.get("category"))
+    return {"count": len(sources), "sources": sources}
+
+
 def _generate_layer_style(args: dict, get_json: Callable) -> dict:
     """Genere un style QGIS (.qml) a partir d'une legende [{label,color,geometry}]."""
     try:
@@ -215,6 +224,20 @@ NATIVE_TOOLS: List[NativeTool] = [
             "required": ["bbox"],
         },
         executor=_search_satellite,
+    ),
+    NativeTool(
+        name="list_data_sources",
+        description=(
+            "Lister les sources cartographiques mondiales gratuites chargeables "
+            "(fonds OSM/CARTO/ESRI, satellite, occupation du sol ESA WorldCover, "
+            "IGN/Cadastre France...). Filtrer par 'category'. Enchainer avec "
+            "addDataSource pour charger une source dans QGIS."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {"category": {"type": "string", "description": "ex: basemap, satellite, france, occupation_sol, relief"}},
+        },
+        executor=_list_data_sources,
     ),
     NativeTool(
         name="list_symbology_presets",

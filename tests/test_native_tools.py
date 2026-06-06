@@ -111,7 +111,8 @@ def test_to_openai_tools_and_names():
     names = nt.native_tool_names()
     assert set(names) == {
         "geocode", "weather", "elevation", "search_satellite_imagery",
-        "wikipedia", "generate_layer_style", "list_symbology_presets"}
+        "wikipedia", "generate_layer_style", "list_symbology_presets",
+        "list_data_sources"}
     for t in tools:
         assert t["type"] == "function"
         assert t["function"]["parameters"]["type"] == "object"
@@ -121,3 +122,15 @@ def test_execute_native_unknown_raises():
     import pytest
     with pytest.raises(ValueError):
         nt.execute_native_tool("doesNotExist", {})
+
+
+def test_list_data_sources_tool():
+    out = nt._list_data_sources({}, None)
+    assert out["count"] >= 15
+    assert any(s["id"] == "osm-standard" for s in out["sources"])
+
+
+def test_list_data_sources_filter_category():
+    out = nt._list_data_sources({"category": "satellite"}, None)
+    assert out["count"] >= 1
+    assert all(s["category"] == "satellite" for s in out["sources"])
