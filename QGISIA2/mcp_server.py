@@ -545,6 +545,23 @@ TOOL_CATALOG: list[McpToolSpec] = [
         payload_builder=_direct_payload,
     ),
     McpToolSpec(
+        name="classifyChange",
+        description=(
+            "Styliser une carte de changement (dNDVI/dNBR de computeRasterDifference) en "
+            "classes de severite : 'dndvi' (perte/gain de vegetation) ou 'dnbr_feu' (USGS)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "schemeId": {"type": "string", "enum": ["dndvi", "dnbr_feu"]},
+            },
+            "required": ["layerId", "schemeId"],
+        },
+        endpoint="/api/qgis/classifyChange",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
         name="renderMapView",
         description=(
             "Rendre la vue carte courante en image PNG (pour la boucle vision : faire "

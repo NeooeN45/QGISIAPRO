@@ -353,6 +353,24 @@ def main():
         except Exception as exc:
             rec("bridge.classifyRaster", False, str(exc))
 
+        # Classes de severite de changement (analyse) sur la carte dNDVI
+        try:
+            diff_layers = [lyr for lyr in QgsProject.instance().mapLayers().values()
+                           if lyr.name().startswith("DIFF_")]
+            if diff_layers:
+                dn = diff_layers[0].name()
+                raw_ch = bridge.classifyChange(dn, "dndvi")
+                pch = json.loads(raw_ch) if raw_ch else {}
+                rl2 = QgsProject.instance().mapLayersByName(dn)
+                rtype2 = rl2[0].renderer().type() if rl2 and rl2[0].renderer() else ""
+                rec("bridge.classifyChange",
+                    pch.get("ok") is True and rtype2 == "singlebandpseudocolor",
+                    f"layer={dn} classes={pch.get('classes')} renderer={rtype2}")
+            else:
+                rec("bridge.classifyChange", False, "no DIFF layer")
+        except Exception as exc:
+            rec("bridge.classifyChange", False, str(exc))
+
         # Boucle vision : rendre la vue carte en image (pour critique VLM)
         try:
             import tempfile

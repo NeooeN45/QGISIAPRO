@@ -2414,6 +2414,59 @@ class QgisBridge(BridgeQObject):
         return json.dumps({"ok": True, "layer": raster.name(), "scheme": scheme_id},
                           ensure_ascii=False)
 
+    @BridgeSlot(str, str, result=str)
+    def classifyChange(self, layer_ref, scheme_id):
+        """Stylise une carte de changement (ex: dNDVI de computeRasterDifference) en classes
+        de severite ('dndvi', 'dnbr_feu') via un style raster discret colore."""
+        raster = self._ensure_raster_layer(str(layer_ref or "").strip())
+        if raster is None:
+            self._notify(f"Raster introuvable : {layer_ref}", Qgis.Warning)
+            return ""
+        try:
+            from change_classes import get_scheme
+        except ImportError:
+            from .change_classes import get_scheme
+        scheme = get_scheme(str(scheme_id or "").strip())
+        if scheme is None:
+            self._notify(f"Schema de changement inconnu : {scheme_id}", Qgis.Warning)
+            return ""
+
+        items = []
+        for cls in scheme["classes"]:
+            top = cls["max"]
+            val = top if top is not None else 1e9
+            items.append(
+                f'<item value="{val:g}" label="{cls["label"]}" alpha="255" '
+                f'color="{cls["color"]}"/>')
+        items_xml = "\n          ".join(items)
+        qml = (
+            '<!DOCTYPE qgis>\n<qgis version="3.34" styleCategories="Symbology">\n'
+            '  <pipe>\n'
+            '    <rasterrenderer type="singlebandpseudocolor" band="1" opacity="1">\n'
+            '      <rastershader>\n'
+            '        <colorrampshader colorRampType="DISCRETE" classificationMode="1">\n'
+            f'          {items_xml}\n'
+            '        </colorrampshader>\n'
+            '      </rastershader>\n'
+            '    </rasterrenderer>\n'
+            '  </pipe>\n</qgis>\n'
+        )
+
+        from qgis.PyQt.QtXml import QDomDocument
+        doc = QDomDocument()
+        if not doc.setContent(qml):
+            self._notify("QML de changement invalide.", Qgis.Warning)
+            return ""
+        ok, err = raster.importNamedStyle(doc)
+        if not ok:
+            self._notify(f"Echec application classes changement : {err}", Qgis.Warning)
+            return ""
+        self._refresh_layer_rendering(raster)
+        self._notify(f"Classes de changement '{scheme_id}' appliquees sur {raster.name()}.",
+                     Qgis.Success)
+        return json.dumps({"ok": True, "layer": raster.name(), "scheme": scheme_id,
+                           "classes": len(scheme["classes"])}, ensure_ascii=False)
+
     @BridgeSlot(str, str, str, result=str)
     def renderMapView(self, output_path, width, height):
         """Rend la vue carte courante en image PNG. Brique de la BOUCLE VISION : l'agent
@@ -3375,6 +3428,12 @@ class ThreadedAssetServer:
                     body.get("outputPath", ""),
                     str(body.get("width", "")),
                     str(body.get("height", "")),
+                )
+            elif route == "/api/qgis/classifyChange":
+                result = self._bridge_call(
+                    "classifyChange",
+                    body.get("layerId", ""),
+                    body.get("schemeId", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(
