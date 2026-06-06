@@ -430,6 +430,24 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/computeRasterDifference",
         payload_builder=_direct_payload,
     ),
+    McpToolSpec(
+        name="zonalStatistics",
+        description=(
+            "Statistiques zonales d'un raster par entite d'une couche de polygones "
+            "(ex: NDVI moyen par parcelle). Ajoute des champs mean/min/max/count a la couche."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "rasterId": {"type": "string"},
+                "polygonId": {"type": "string"},
+                "prefix": {"type": "string", "description": "Prefixe des champs (defaut zs_)"},
+            },
+            "required": ["rasterId", "polygonId"],
+        },
+        endpoint="/api/qgis/zonalStatistics",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 

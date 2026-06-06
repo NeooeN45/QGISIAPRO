@@ -2044,6 +2044,46 @@ class QgisBridge(BridgeQObject):
         return json.dumps(payload, ensure_ascii=False)
 
     @BridgeSlot(str, str, str, result=str)
+    def zonalStatistics(self, raster_ref, polygon_ref, prefix):
+        """Statistiques zonales d'un raster par entite d'une couche de polygones
+        (ex: NDVI moyen par parcelle). Ajoute des champs <prefix>mean/min/max/count
+        a la couche vecteur. (P1 - diagnostic par zone)."""
+        try:
+            from qgis.analysis import QgsZonalStatistics
+        except ImportError:
+            self._notify("QgsZonalStatistics indisponible.", Qgis.Critical)
+            return ""
+
+        raster = self._ensure_raster_layer(str(raster_ref or "").strip())
+        poly = self._find_layer(str(polygon_ref or "").strip())
+        if raster is None:
+            self._notify(f"Raster introuvable : {raster_ref}", Qgis.Warning)
+            return ""
+        if not isinstance(poly, QgsVectorLayer) or \
+                poly.geometryType() != QgsWkbTypes.PolygonGeometry:
+            self._notify("Couche de polygones requise pour les stats zonales.", Qgis.Warning)
+            return ""
+
+        prefix = str(prefix or "").strip() or "zs_"
+        stats = (QgsZonalStatistics.Mean | QgsZonalStatistics.Min
+                 | QgsZonalStatistics.Max | QgsZonalStatistics.Count)
+        try:
+            zs = QgsZonalStatistics(poly, raster, prefix, 1, QgsZonalStatistics.Statistics(stats))
+            zs.calculateStatistics(None)
+        except Exception as exc:  # noqa: BLE001
+            self._notify(f"Echec des stats zonales : {exc}", Qgis.Critical)
+            return ""
+
+        fields_added = [f.name() for f in poly.fields() if f.name().startswith(prefix)]
+        poly.triggerRepaint()
+        message = f"Stats zonales calculees sur {poly.name()} ({len(fields_added)} champs)."
+        self._notify(message, Qgis.Success)
+        return json.dumps({
+            "ok": True, "layer": poly.name(), "prefix": prefix,
+            "fields_added": fields_added,
+        }, ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
     def mergeRasterBands(self, layer_ids_json, output_name, output_path):
         try:
             layer_ids = json.loads(layer_ids_json) if layer_ids_json else []
@@ -2909,6 +2949,13 @@ class ThreadedAssetServer:
                     body.get("layerA", ""),
                     body.get("layerB", ""),
                     body.get("outputPath", ""),
+                )
+            elif route == "/api/qgis/zonalStatistics":
+                result = self._bridge_call(
+                    "zonalStatistics",
+                    body.get("rasterId", ""),
+                    body.get("polygonId", ""),
+                    body.get("prefix", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(

@@ -260,6 +260,24 @@ def main():
         except Exception as exc:
             rec("bridge.computeRasterDifference", False, str(exc))
 
+        # Statistiques zonales (P1) : raster moyen par polygone
+        try:
+            poly = QgsVectorLayer("Polygon?crs=EPSG:2154", "zone_test", "memory")
+            pf = QgsFeature()
+            pf.setGeometry(QgsGeometry.fromWkt(
+                "Polygon((600000 6199960, 600040 6199960, 600040 6200000, "
+                "600000 6200000, 600000 6199960))"))
+            poly.dataProvider().addFeatures([pf]); poly.updateExtents()
+            QgsProject.instance().addMapLayer(poly)
+            raw_zs = bridge.zonalStatistics("s2_red", "zone_test", "zs_")
+            pzs = json.loads(raw_zs) if raw_zs else {}
+            fields = pzs.get("fields_added", [])
+            rec("bridge.zonalStatistics",
+                pzs.get("ok") is True and any("mean" in f for f in fields),
+                f"fields={fields}")
+        except Exception as exc:
+            rec("bridge.zonalStatistics", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()
