@@ -367,6 +367,26 @@ TOOL_CATALOG: list[McpToolSpec] = [
         payload_builder=_direct_payload,
     ),
     McpToolSpec(
+        name="loadSatelliteBands",
+        description=(
+            "Charger des bandes d'une image satellite Sentinel-2 (STAC Earth Search) sur "
+            "une emprise bbox, image la moins nuageuse. bands ex ['RED','NIR']. A enchainer "
+            "avec computeSpectralIndex pour un NDVI sur vrai Sentinel."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "bbox": {"type": "string", "description": "minlon,minlat,maxlon,maxlat (WGS84)"},
+                "collection": {"type": "string", "default": "sentinel-2-l2a"},
+                "bands": {"type": "array", "items": {"type": "string"}},
+                "datetime": {"type": "string", "description": "Periode ISO ex 2025-06-01/2025-06-30"},
+            },
+            "required": ["bbox"],
+        },
+        endpoint="/api/qgis/loadSatelliteBands",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
         name="list_dossiers",
         description=(
             "Lister les dossiers territoriaux pre-assembles (urbanisme, risques, foret, "

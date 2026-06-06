@@ -305,6 +305,23 @@ def main():
         except Exception as exc:
             rec("bridge.saveVectorLayer", False, str(exc))
 
+        # P1-S2 : charger des bandes Sentinel-2 reelles (STAC) sur une emprise
+        try:
+            raw_sat = bridge.loadSatelliteBands(
+                "1.40,43.55,1.50,43.65", "sentinel-2-l2a",
+                json.dumps(["RED", "NIR"]), "2024-01-01/2024-12-31")
+            psat = json.loads(raw_sat) if raw_sat else {}
+            bands = psat.get("bands", {})
+            valid = all(QgsProject.instance().mapLayersByName(n) and
+                        QgsProject.instance().mapLayersByName(n)[0].isValid()
+                        for n in bands.values()) if bands else False
+            rec("bridge.loadSatelliteBands",
+                psat.get("ok") is True and len(bands) >= 1 and valid,
+                f"item={psat.get('item')} bands={list(bands)} err={psat.get('error')} "
+                f"raw={raw_sat[:160]!r}")
+        except Exception as exc:
+            rec("bridge.loadSatelliteBands", False, str(exc))
+
         _finish(plugin)
     except Exception:
         tb = traceback.format_exc()

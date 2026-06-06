@@ -1265,6 +1265,67 @@ class QgisBridge(BridgeQObject):
         self._notify(message, Qgis.Success)
         return message
 
+    @BridgeSlot(str, str, str, str, result=str)
+    def loadSatelliteBands(self, bbox, collection, bands_json, datetime):
+        """Cherche une image satellite (STAC Earth Search) sur une emprise, choisit la
+        moins nuageuse, et charge les bandes demandees (COG) dans QGIS. Enchainer avec
+        computeSpectralIndex pour un NDVI sur vrai Sentinel (P1-S2)."""
+        try:
+            from native_tools import EARTH_SEARCH_STAC, _default_get_json
+            from stac_assets import band_assets, normalize_datetime
+        except ImportError:
+            from .native_tools import EARTH_SEARCH_STAC, _default_get_json
+            from .stac_assets import band_assets, normalize_datetime
+
+        bbox = str(bbox or "").strip()
+        if not bbox:
+            self._notify("Emprise (bbox) requise.", Qgis.Warning)
+            return ""
+        collection = str(collection or "").strip() or "sentinel-2-l2a"
+        try:
+            bands = json.loads(bands_json) if bands_json else ["RED", "NIR"]
+        except json.JSONDecodeError:
+            bands = ["RED", "NIR"]
+
+        params = {"collections": collection, "bbox": bbox, "limit": 10}
+        norm_dt = normalize_datetime(datetime)
+        if norm_dt:
+            params["datetime"] = norm_dt
+        try:
+            data = _default_get_json(EARTH_SEARCH_STAC, params)
+        except Exception as exc:  # noqa: BLE001
+            msg = f"Recherche STAC echouee : {exc}"
+            self._notify(msg, Qgis.Warning, duration=6)
+            return json.dumps({"ok": False, "error": msg}, ensure_ascii=False)
+
+        feats = (data or {}).get("features", []) or []
+        if not feats:
+            msg = "Aucune image satellite pour cette emprise/periode."
+            self._notify(msg, Qgis.Warning)
+            return json.dumps({"ok": False, "error": msg,
+                               "stac_keys": list((data or {}).keys())}, ensure_ascii=False)
+        feats.sort(key=lambda f: (f.get("properties", {}) or {}).get("eo:cloud_cover", 100))
+        item = feats[0]
+
+        loaded = {}
+        for band, href in band_assets(item, bands).items():
+            name = f"{collection}_{band}"
+            msg = self.addRemoteRaster(href, name)
+            if "charge" in msg.lower():
+                loaded[band] = name
+        if not loaded:
+            self._notify("Image trouvee mais aucune bande chargeable.", Qgis.Warning)
+            return ""
+
+        props = item.get("properties", {}) or {}
+        self._notify(f"{len(loaded)} bande(s) chargee(s) (item {item.get('id')}).", Qgis.Success)
+        return json.dumps({
+            "ok": True, "item": item.get("id"),
+            "datetime": props.get("datetime"),
+            "cloud_cover": props.get("eo:cloud_cover"),
+            "bands": loaded,
+        }, ensure_ascii=False)
+
     @BridgeSlot(str, str, result=str)
     def addGeoJsonLayer(self, geojson_text, layer_name):
         geojson_text = str(geojson_text or "").strip()
@@ -2980,6 +3041,17 @@ class ThreadedAssetServer:
                     "addRemoteRaster",
                     body.get("url", ""),
                     body.get("layerName", ""),
+                )
+            elif route == "/api/qgis/loadSatelliteBands":
+                bands = body.get("bands", "")
+                if isinstance(bands, (list, tuple)):
+                    bands = json.dumps(list(bands))
+                result = self._bridge_call(
+                    "loadSatelliteBands",
+                    body.get("bbox", ""),
+                    body.get("collection", "sentinel-2-l2a"),
+                    bands,
+                    body.get("datetime", ""),
                 )
             elif route == "/api/qgis/addGeoJsonLayer":
                 result = self._bridge_call(

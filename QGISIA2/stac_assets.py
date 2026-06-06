@@ -39,6 +39,30 @@ def resolve_asset_href(item: dict, band: str) -> Optional[str]:
     return None
 
 
+def normalize_datetime(dt: Optional[str]) -> Optional[str]:
+    """Normalise un datetime STAC en RFC3339 (Earth Search rejette les dates seules).
+
+    '2024-01-01/2024-12-31' -> '2024-01-01T00:00:00Z/2024-12-31T23:59:59Z'
+    '2024-06-15' -> '2024-06-15T00:00:00Z' ; '..' et les bornes ouvertes preserves.
+    """
+    if not dt:
+        return None
+    dt = str(dt).strip()
+
+    def _fix(part: str, end: bool = False) -> str:
+        part = part.strip()
+        if not part or part == "..":
+            return part
+        if "T" in part:
+            return part
+        return part + ("T23:59:59Z" if end else "T00:00:00Z")
+
+    if "/" in dt:
+        start, _, stop = dt.partition("/")
+        return f"{_fix(start)}/{_fix(stop, end=True)}"
+    return _fix(dt)
+
+
 def band_assets(item: dict, bands: List[str]) -> dict:
     """{band: href} pour les bandes resolues (ignore celles sans asset)."""
     out = {}
