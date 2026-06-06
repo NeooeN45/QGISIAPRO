@@ -21,6 +21,45 @@ def test_to_openai_tools_shape():
         assert fn["parameters"]["type"] == "object"
 
 
+def test_to_openai_tools_includes_native_and_qgis():
+    names = [t["function"]["name"] for t in at.to_openai_tools()]
+    assert "geocode" in names      # outil natif (web/geo)
+    assert "getLayersList" in names  # outil QGIS (bridge)
+
+
+def test_run_tool_loop_dispatches_native_tool_without_bridge():
+    import json as _json
+    state = {"i": 0}
+
+    def fake_chat(model, messages, api_keys, tools=None, stream=False, **kw):
+        state["i"] += 1
+        if state["i"] == 1:
+            return {"choices": [{"message": {
+                "content": None,
+                "tool_calls": [{
+                    "id": "g1",
+                    "function": {"name": "geocode", "arguments": _json.dumps({"query": "Toulouse"})},
+                }],
+            }}]}
+        return {"choices": [{"message": {"content": "Toulouse se situe a 43.6, 1.44."}}]}
+
+    def fake_get(url, params, timeout=20):
+        return [{"display_name": "Toulouse, France", "lat": "43.6", "lon": "1.44"}]
+
+    bridge = _FakeClient("NE DOIT PAS ETRE APPELE")
+    res = at.run_tool_loop(
+        [{"role": "user", "content": "ou se trouve Toulouse ?"}],
+        api_keys={},
+        chat_fn=fake_chat,
+        http_client=bridge,
+        native_get_json=fake_get,
+        max_iters=2,
+    )
+    assert res["trace"][0]["tool"] == "geocode"
+    assert "Toulouse" in res["trace"][0]["result"]
+    assert bridge.calls == []  # outil natif -> aucun appel au bridge QGIS
+
+
 def test_tool_names_include_core_map_ops():
     names = at.tool_names()
     for expected in ("getLayersList", "setLayerVisibility", "zoomToLayer",

@@ -28,11 +28,28 @@ except ImportError:  # pragma: no cover - fallback import package
         DEFAULT_BRIDGE_URL,
     )
 
+try:
+    from native_tools import (
+        native_tool_names,
+        execute_native_tool,
+        to_openai_tools as _native_openai_tools,
+    )
+except ImportError:  # pragma: no cover
+    from .native_tools import (  # type: ignore
+        native_tool_names,
+        execute_native_tool,
+        to_openai_tools as _native_openai_tools,
+    )
+
 
 def to_openai_tools(catalog: Optional[List[McpToolSpec]] = None) -> List[dict]:
-    """Convertit le catalogue d'outils QGIS au format OpenAI 'tools' (function calling)."""
+    """
+    Convertit le catalogue d'outils au format OpenAI 'tools' (function calling).
+    Par defaut : outils QGIS (bridge) + outils natifs (web/geo). Si `catalog` est
+    fourni explicitement, on ne renvoie que celui-ci (sans les natifs).
+    """
     specs = catalog if catalog is not None else TOOL_CATALOG
-    return [
+    tools = [
         {
             "type": "function",
             "function": {
@@ -43,6 +60,9 @@ def to_openai_tools(catalog: Optional[List[McpToolSpec]] = None) -> List[dict]:
         }
         for spec in specs
     ]
+    if catalog is None:
+        tools = tools + _native_openai_tools()
+    return tools
 
 
 def tool_names(catalog: Optional[List[McpToolSpec]] = None) -> List[str]:
@@ -146,6 +166,7 @@ def run_tool_loop(
     bridge_url: str = DEFAULT_BRIDGE_URL,
     chat_fn: Any = None,
     http_client: Any = None,
+    native_get_json: Any = None,
 ) -> dict:
     """
     Boucle agentique de tool calling :
@@ -203,10 +224,16 @@ def run_tool_loop(
                 })
             else:
                 try:
-                    result = execute_tool_call(
-                        call["name"], call["arguments"],
-                        bridge_url=bridge_url, http_client=http_client,
-                    )
+                    if call["name"] in native_tool_names():
+                        # Outil natif (web/geo) : execution en-process, hors bridge QGIS.
+                        result = execute_native_tool(
+                            call["name"], call["arguments"], get_json=native_get_json,
+                        )
+                    else:
+                        result = execute_tool_call(
+                            call["name"], call["arguments"],
+                            bridge_url=bridge_url, http_client=http_client,
+                        )
                 except Exception as exc:  # noqa: BLE001
                     result = f"Erreur outil {call['name']}: {exc}"
                 trace.append({
