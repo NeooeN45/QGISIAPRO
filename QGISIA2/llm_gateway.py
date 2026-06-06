@@ -125,6 +125,21 @@ def _extract_provider(model_name: str) -> str:
     return ""
 
 
+def build_vision_messages(prompt: str, image_b64: str, mime: str = "image/png") -> List[Dict[str, Any]]:
+    """Construit des messages OpenAI multimodaux (texte + image base64) pour un VLM.
+
+    L'image est passee en data URL ; LiteLLM la transmet au provider (NVIDIA NIM via
+    openai/). Utilise par la boucle vision (critique d'un rendu cartographique).
+    """
+    return [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{image_b64}"}},
+        ],
+    }]
+
+
 def _build_completion_kwargs(
     model: str,
     messages: List[Dict[str, Any]],

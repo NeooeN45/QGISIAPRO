@@ -3851,6 +3851,57 @@ class ThreadedAssetServer:
                 self._send_json(handler, 200, {"ok": True, "result": result})
                 return True
 
+            if route == "/api/llm/critiqueView":
+                # BOUCLE VISION fermee : rend la vue carte -> envoie l'image au VLM
+                # (modele vision NVIDIA) -> critique + score + correctifs.
+                if not llm_installer.is_vendor_ready():
+                    self._send_json(handler, 503, {"ok": False, "error": "gateway_not_ready"})
+                    return True
+
+                api_keys = body.get("api_keys", {}) or {}
+                intent = body.get("intent", "") or "carte cartographique"
+                layout_meta = body.get("layout_meta") or {}
+                model = body.get("model") or "nvidia_nim/meta/llama-3.2-90b-vision-instruct"
+
+                image_path = body.get("imagePath")
+                if not image_path:
+                    image_path = os.path.join(tempfile.gettempdir(), "critique_view.png")
+                    self._bridge_call("renderMapView", image_path,
+                                      str(body.get("width", "")), str(body.get("height", "")))
+                if not image_path or not os.path.exists(image_path):
+                    self._send_json(handler, 500, {"ok": False, "error": "render_failed"})
+                    return True
+
+                import base64
+                with open(image_path, "rb") as fh:
+                    b64 = base64.b64encode(fh.read()).decode("ascii")
+
+                try:
+                    from vision_critique import (
+                        build_critique_prompt, completeness_score, suggest_fixes)
+                except ImportError:
+                    from .vision_critique import (
+                        build_critique_prompt, completeness_score, suggest_fixes)
+
+                prompt = build_critique_prompt(intent, layout_meta)
+                messages = llm_gateway.build_vision_messages(prompt, b64)
+                resp = llm_gateway.chat(
+                    model, messages, api_keys=api_keys,
+                    max_tokens=int(body.get("max_tokens", 400)))
+                msg = (resp.get("choices") or [{}])[0].get("message", {})
+                critique = msg.get("content") or msg.get("reasoning_content") or ""
+                score = completeness_score(layout_meta)
+                self._send_json(handler, 200, {
+                    "ok": True,
+                    "critique": critique,
+                    "model_used": resp.get("_gateway", {}).get("model_used"),
+                    "score": score["score"],
+                    "missing": score["missing"],
+                    "fixes": suggest_fixes(layout_meta),
+                    "render_path": image_path,
+                })
+                return True
+
             return False
         except Exception as exc:
             self._send_json(handler, 500, {
