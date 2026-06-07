@@ -22,9 +22,11 @@ reproduction de carte (légende→QML) · dossiers territoriaux 1-clic · export
 - **Rapports narrés** : synthèse automatique (chiffres + graphiques + recommandations).
 
 ## Palier 3 — Moonshot (objectif final 🌠)
-- **Étude territoriale 100% autonome** : 20→100 étapes, l'agent planifie, exécute,
-  s'auto-corrige via **boucle vision** (rendu canvas → VLM critique → ajuste) jusqu'à
-  la perfection visuelle.
+- ✅ **Étude territoriale autonome** : `/api/llm/autoStudy` déroule un plan (`study_plan`)
+  en enchaînant les outils (basemap → Sentinel → indice → changement → classification →
+  planche → rapport) puis critique le rendu via le VLM. Thèmes : végétation, urbanisme, risques.
+- **Vers le 100% autonome** : 20→100 étapes auto-corrigées via la **boucle vision**
+  (rendu → VLM critique → ajuste) jusqu'à la perfection visuelle.
   - ✅ **Boucle fermée et vérifiée** : `renderMapView` (vue→PNG) → `/api/llm/critiqueView`
     envoie l'image au **VLM NVIDIA** (Llama-3.2-90b-vision / Nemotron Omni) qui critique le
     rendu, combiné au score heuristique `critique_layout` + correctifs. Testé sur un rendu
