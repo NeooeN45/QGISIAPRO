@@ -18,6 +18,7 @@ import { downloadMarkdown } from "../lib/export-markdown";
 import { exportConversationToJson, exportConversationToMarkdown, downloadFile } from "../lib/conversation-export";
 import { isQgisAvailable, LayerSummary, openQgisLayersPanel } from "../lib/qgis";
 import { useUIStore } from "../stores/useUIStore";
+import { useGatewayStore } from "../stores/useGatewayStore";
 import { appendDebugEvent } from "../lib/debug-log";
 import { toast } from "sonner";
 import ThemeToggle from "./ThemeToggle";
@@ -53,6 +54,16 @@ export default function ChatHeader({
   const setShowPluginSetup = useUIStore((s) => s.setShowPluginSetup);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const gw = useGatewayStore((s) => s.config);
+  const aiMode = gw.agentMode
+    ? { label: "Action IA", cls: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-200/80" }
+    : gw.federationMode
+      ? { label: "SIG intelligent", cls: "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-200/80" }
+      : gw.useGateway
+        ? { label: "Gateway", cls: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200/80" }
+        : { label: "Local", cls: "border-gray-400/25 bg-gray-400/10 text-gray-600 dark:text-white/55" };
+  const aiDot = gw.status === "ready" ? "bg-emerald-400" : gw.status === "error" ? "bg-red-400" : "bg-amber-400";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -122,6 +133,16 @@ export default function ChatHeader({
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-200/80">
                 <TreePine size={10} />
                 53 sources officielles
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+                  aiMode.cls,
+                )}
+                title={`Mode IA actif · modèle ${gw.defaultAlias} · statut ${gw.status}`}
+              >
+                <span className={cn("h-1.5 w-1.5 rounded-full", aiDot)} />
+                {aiMode.label} · {gw.defaultAlias}
               </span>
               <div className="inline-flex rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] p-0.5">
                 <button
