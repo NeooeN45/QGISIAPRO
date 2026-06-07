@@ -411,6 +411,25 @@ def main():
         except Exception as exc:
             rec("bridge.exportAtlas", False, str(exc))
 
+        # Analyse de site (suitability) : somme ponderee de rasters criteres
+        try:
+            crit = json.dumps([{"layer": "s2_nir", "weight": 0.6},
+                               {"layer": "s2_red", "weight": 0.4, "invert": True}])
+            sp = json.loads(bridge.suitabilityAnalysis(crit, "") or "{}")
+            ok = sp.get("ok") is True and bool(QgsProject.instance().mapLayersByName("Aptitude"))
+            rec("bridge.suitabilityAnalysis", ok,
+                f"expr={sp.get('expression')} crit={sp.get('criteria')}")
+        except Exception as exc:
+            rec("bridge.suitabilityAnalysis", False, str(exc))
+
+        # Hotspots : densite de noyau (kernel density) sur la couche de points
+        try:
+            hp = json.loads(bridge.hotspotAnalysis("smoke_layer", "", "") or "{}")
+            ok = hp.get("ok") is True and bool(QgsProject.instance().mapLayersByName("Hotspots"))
+            rec("bridge.hotspotAnalysis", ok, f"radius={hp.get('radius')}")
+        except Exception as exc:
+            rec("bridge.hotspotAnalysis", False, str(exc))
+
         # Boucle vision : rendre la vue carte en image (pour critique VLM)
         try:
             import tempfile

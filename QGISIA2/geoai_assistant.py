@@ -2600,6 +2600,116 @@ class QgisBridge(BridgeQObject):
                            "base_layout": base_layout,
                            "atlas": atlas_id or None}, ensure_ascii=False)
 
+    @BridgeSlot(str, str, result=str)
+    def suitabilityAnalysis(self, criteria_json, output_path):
+        """Carte d'aptitude (site selection) : somme ponderee de rasters criteres
+        (pente, NDVI, distance...). criteria_json : [{"layer","weight","invert"?}]."""
+        from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
+        try:
+            criteria = json.loads(criteria_json) if criteria_json else []
+        except (ValueError, TypeError):
+            criteria = []
+        if not isinstance(criteria, list) or not criteria:
+            self._notify("Criteres requis (liste non vide).", Qgis.Warning)
+            return ""
+
+        entries, terms, base = [], [], None
+        for c in criteria:
+            layer = self._ensure_raster_layer(str(c.get("layer", "")).strip())
+            if layer is None:
+                self._notify(f"Raster critere introuvable : {c.get('layer')}", Qgis.Warning)
+                return ""
+            base = base or layer
+            ref = f"{layer.name()}@1"
+            entry = QgsRasterCalculatorEntry()
+            entry.ref = ref
+            entry.raster = layer
+            entry.bandNumber = 1
+            entries.append(entry)
+            try:
+                weight = float(c.get("weight", 1))
+            except (ValueError, TypeError):
+                weight = 1.0
+            term = f'(1 - "{ref}")' if c.get("invert") else f'"{ref}"'
+            terms.append(f"{weight} * {term}")
+
+        expression = " + ".join(terms)
+        out_path = str(output_path or "").strip() or str(self._runtime_directory() / "suitability.tif")
+        out_name = "Aptitude"
+        calc = QgsRasterCalculator(
+            expression, out_path, "GTiff", base.extent(), base.width(), base.height(), entries)
+        if calc.processCalculation() != 0:
+            self._notify("Echec du calcul d'aptitude.", Qgis.Critical)
+            return ""
+        rl = QgsRasterLayer(out_path, out_name)
+        if self._add_layer_to_project(rl, out_name, source="Suitability") is None:
+            self._notify("Aptitude calculee mais non chargeable.", Qgis.Warning)
+            return ""
+        try:
+            from raster_style import build_pseudocolor_qml
+        except ImportError:
+            from .raster_style import build_pseudocolor_qml
+        try:
+            vmax = sum(abs(float(c.get("weight", 1))) for c in criteria) or 1.0
+            self.applyQmlStyle(out_name, build_pseudocolor_qml("rdylgn", 0.0, vmax, 1))
+        except Exception:  # noqa: BLE001
+            pass
+        self._notify(f"Carte d'aptitude creee : {out_name}.", Qgis.Success)
+        return json.dumps({"ok": True, "layer": out_name, "path": out_path,
+                           "expression": expression, "criteria": len(criteria)},
+                          ensure_ascii=False)
+
+    @BridgeSlot(str, str, str, result=str)
+    def hotspotAnalysis(self, point_ref, radius, output_path):
+        """Carte de chaleur (densite de noyau) d'une couche de points = hotspots."""
+        from qgis.analysis import QgsKernelDensityEstimation
+        pts = self._find_layer(str(point_ref or "").strip())
+        if not isinstance(pts, QgsVectorLayer) or pts.geometryType() != QgsWkbTypes.PointGeometry:
+            self._notify("Couche de points requise pour les hotspots.", Qgis.Warning)
+            return ""
+        try:
+            rad = float(str(radius).replace(",", ".")) if radius else 0.0
+        except ValueError:
+            rad = 0.0
+        ext = pts.extent()
+        span = max(ext.width(), ext.height()) or 1.0
+        if rad <= 0:
+            rad = span / 10.0
+        pixel = span / 300.0 or 1.0
+
+        out_path = str(output_path or "").strip() or str(self._runtime_directory() / "hotspots.tif")
+        params = QgsKernelDensityEstimation.Parameters()
+        params.source = pts
+        params.radius = rad
+        params.pixelSize = pixel
+        try:
+            kde = QgsKernelDensityEstimation(params, out_path, "GTiff")
+            if kde.run() != QgsKernelDensityEstimation.Success:
+                self._notify("Echec du calcul de densite (hotspots).", Qgis.Critical)
+                return ""
+        except Exception as exc:  # noqa: BLE001
+            self._notify(f"Erreur hotspots : {exc}", Qgis.Critical)
+            return ""
+
+        out_name = "Hotspots"
+        rl = QgsRasterLayer(out_path, out_name)
+        if self._add_layer_to_project(rl, out_name, source="Hotspot") is None:
+            self._notify("Densite calculee mais non chargeable.", Qgis.Warning)
+            return ""
+        try:
+            from raster_style import build_pseudocolor_qml
+        except ImportError:
+            from .raster_style import build_pseudocolor_qml
+        try:
+            st = rl.dataProvider().bandStatistics(1)
+            self.applyQmlStyle(out_name, build_pseudocolor_qml(
+                "thermal", st.minimumValue, st.maximumValue, 1))
+        except Exception:  # noqa: BLE001
+            pass
+        self._notify(f"Hotspots crees : {out_name}.", Qgis.Success)
+        return json.dumps({"ok": True, "layer": out_name, "path": out_path,
+                           "radius": rad}, ensure_ascii=False)
+
     @BridgeSlot(str, str, str, result=str)
     def renderMapView(self, output_path, width, height):
         """Rend la vue carte courante en image PNG. Brique de la BOUCLE VISION : l'agent
@@ -3586,6 +3696,19 @@ class ThreadedAssetServer:
                     body.get("outputPath", ""),
                     body.get("atlasId", ""),
                     body.get("pageField", ""),
+                )
+            elif route == "/api/qgis/suitabilityAnalysis":
+                criteria = body.get("criteria", "[]")
+                if isinstance(criteria, (list, dict)):
+                    criteria = json.dumps(criteria)
+                result = self._bridge_call(
+                    "suitabilityAnalysis", criteria, body.get("outputPath", ""))
+            elif route == "/api/qgis/hotspotAnalysis":
+                result = self._bridge_call(
+                    "hotspotAnalysis",
+                    body.get("pointId", ""),
+                    str(body.get("radius", "")),
+                    body.get("outputPath", ""),
                 )
             elif route == "/api/qgis/mergeRasterBands":
                 result = self._bridge_call(

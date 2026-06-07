@@ -601,6 +601,41 @@ TOOL_CATALOG: list[McpToolSpec] = [
         payload_builder=_direct_payload,
     ),
     McpToolSpec(
+        name="suitabilityAnalysis",
+        description=(
+            "Carte d'aptitude (site selection) : somme ponderee de rasters criteres. "
+            "criteria = [{layer, weight, invert?}] (invert pour les criteres defavorables)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "criteria": {"type": "array", "items": {"type": "object"}},
+                "outputPath": {"type": "string"},
+            },
+            "required": ["criteria"],
+        },
+        endpoint="/api/qgis/suitabilityAnalysis",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="hotspotAnalysis",
+        description=(
+            "Carte de chaleur (densite de noyau) d'une couche de points = hotspots. "
+            "radius dans l'unite du CRS (auto si 0)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pointId": {"type": "string"},
+                "radius": {"type": "number"},
+                "outputPath": {"type": "string"},
+            },
+            "required": ["pointId"],
+        },
+        endpoint="/api/qgis/hotspotAnalysis",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
         name="renderMapView",
         description=(
             "Rendre la vue carte courante en image PNG (pour la boucle vision : faire "
