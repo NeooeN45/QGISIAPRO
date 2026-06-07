@@ -28,8 +28,11 @@ reproduction de carte (légende→QML) · dossiers territoriaux 1-clic · export
   - ✅ **Boucle fermée et vérifiée** : `renderMapView` (vue→PNG) → `/api/llm/critiqueView`
     envoie l'image au **VLM NVIDIA** (Llama-3.2-90b-vision / Nemotron Omni) qui critique le
     rendu, combiné au score heuristique `critique_layout` + correctifs. Testé sur un rendu
-    QGIS réel (critique concrète : cadrage, lisibilité, légende). L'agent peut donc
-    s'auto-corriger : rendre → critiquer → ajuster → re-rendre.
+    QGIS réel (critique concrète : cadrage, lisibilité, légende).
+  - ✅ **Auto-amélioration multi-tours** : `/api/llm/autoImproveLayout` part du meilleur
+    gabarit, ajoute à chaque tour les éléments manquants (`augment_to_complete`) et
+    re-rend via `exportLayoutSpec` jusqu'au score cible, puis critique VLM du rendu final.
+    L'agent converge tout seul vers une planche complète.
 - **« Décris, l'IA réalise »** : reproduction pixel-perfect d'une carte depuis n'importe
   quelle image/PDF (symbologie, légende, étiquetage, géoréférencement) sur la zone voulue.
 - **Prédictif** : Earth-2 (météo) + détection de changement → projection d'évolution
