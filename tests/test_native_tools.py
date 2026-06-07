@@ -128,7 +128,8 @@ def test_to_openai_tools_and_names():
         "geocode", "weather", "elevation", "search_satellite_imagery",
         "wikipedia", "generate_layer_style", "list_symbology_presets",
         "list_data_sources", "list_dossiers",
-        "list_report_templates", "generate_report", "critique_layout"}
+        "list_report_templates", "generate_report", "critique_layout",
+        "predict_trend", "parse_voice_intent", "list_suitability_presets"}
     for t in tools:
         assert t["type"] == "function"
         assert t["function"]["parameters"]["type"] == "object"
@@ -170,6 +171,24 @@ def test_generate_report_tool():
     assert "Toulouse" in out["markdown"]
     assert "{" not in out["markdown"]  # tous les placeholders fournis -> aucun restant
     assert "commune" in out["required_keys"]
+
+
+def test_predict_trend_tool():
+    out = nt._predict_trend({"points": [[0, 0], [1, 1], [2, 2]], "horizon": 2}, None)
+    assert round(out["trend"]["slope"], 3) == 1.0
+    assert len(out["projection"]) == 2
+    assert out["classification"] == "amelioration"
+
+
+def test_parse_voice_intent_tool():
+    out = nt._parse_voice_intent({"text": "fais un buffer de 500m autour des ecoles"}, None)
+    assert out["action"] == "buffer"
+    assert out["params"].get("distance") == 500
+
+
+def test_list_suitability_presets_tool():
+    out = nt._list_suitability_presets({}, None)
+    assert len(out["presets"]) >= 3
 
 
 def test_critique_layout_tool():

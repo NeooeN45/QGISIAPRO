@@ -178,6 +178,37 @@ def _critique_layout(args: dict, get_json: Callable) -> dict:
     }
 
 
+def _predict_trend(args: dict, get_json: Callable) -> dict:
+    try:
+        from predict_trend import linear_trend, project, classify_trend  # type: ignore
+    except ImportError:
+        from .predict_trend import linear_trend, project, classify_trend  # type: ignore
+    points = [tuple(p) for p in (args.get("points") or [])]
+    horizon = int(args.get("horizon", 3))
+    tr = linear_trend(points)
+    return {
+        "trend": tr,
+        "projection": project(points, horizon),
+        "classification": classify_trend(tr["slope"]),
+    }
+
+
+def _parse_voice_intent(args: dict, get_json: Callable) -> dict:
+    try:
+        from voice_intents import parse_intent  # type: ignore
+    except ImportError:
+        from .voice_intents import parse_intent  # type: ignore
+    return parse_intent(args.get("text", ""))
+
+
+def _list_suitability_presets(args: dict, get_json: Callable) -> dict:
+    try:
+        from suitability_presets import list_presets  # type: ignore
+    except ImportError:
+        from .suitability_presets import list_presets  # type: ignore
+    return {"presets": list_presets()}
+
+
 def _generate_layer_style(args: dict, get_json: Callable) -> dict:
     """Genere un style QGIS (.qml) a partir d'une legende [{label,color,geometry}]."""
     try:
@@ -341,6 +372,45 @@ NATIVE_TOOLS: List[NativeTool] = [
             "required": ["layout_meta"],
         },
         executor=_critique_layout,
+    ),
+    NativeTool(
+        name="predict_trend",
+        description=(
+            "Projeter une tendance a partir d'une serie temporelle d'indice (ex: dNDVI). "
+            "points=[[t,valeur],...]. Renvoie pente/r2, projection et classification "
+            "(degradation/stable/amelioration)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "points": {"type": "array", "items": {"type": "array"}},
+                "horizon": {"type": "integer"},
+            },
+            "required": ["points"],
+        },
+        executor=_predict_trend,
+    ),
+    NativeTool(
+        name="parse_voice_intent",
+        description=(
+            "Interpreter une phrase utilisateur en action cartographique structuree "
+            "(add_basemap, compute_ndvi, buffer, load_satellite, export_layout...)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {"text": {"type": "string"}},
+            "required": ["text"],
+        },
+        executor=_parse_voice_intent,
+    ),
+    NativeTool(
+        name="list_suitability_presets",
+        description=(
+            "Lister les presets de criteres ponderes pour l'analyse de site "
+            "(panneaux_solaires, zone_constructible, risque_erosion)."
+        ),
+        input_schema={"type": "object", "properties": {}},
+        executor=_list_suitability_presets,
     ),
     NativeTool(
         name="list_symbology_presets",
