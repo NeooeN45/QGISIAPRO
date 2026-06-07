@@ -148,9 +148,9 @@ def test_should_call_samgeo_generate_and_raster_to_vector(fake_raster, fake_geoj
     assert "3 polygones" in result.message
     fake_sam.generate.assert_called_once()
     fake_sam.raster_to_vector.assert_called_once()
-    # min_area transmis
+    # samgeo v3 : min_area n'est plus transmis a raster_to_vector (rejete par le driver GeoJSON)
     _, kwargs = fake_sam.raster_to_vector.call_args
-    assert kwargs.get("min_area") == 50
+    assert "min_area" not in kwargs
 
 
 # ─── segment_text_prompt (mocked) ────────────────────────────────────────────
