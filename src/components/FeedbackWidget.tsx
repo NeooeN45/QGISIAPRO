@@ -22,6 +22,75 @@ interface FeedbackWidgetProps {
   onDismiss?: () => void;
 }
 
+/** Métadonnées visuelles par rating */
+const RATING_META: Record<
+  FeedbackRating,
+  { active: string; ripple: string }
+> = {
+  helpful: {
+    active: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40",
+    ripple: "bg-emerald-400/20",
+  },
+  "needs-improvement": {
+    active: "bg-amber-500/20 text-amber-400 border border-amber-500/40",
+    ripple: "bg-amber-400/20",
+  },
+  "not-helpful": {
+    active: "bg-red-500/20 text-red-400 border border-red-500/40",
+    ripple: "bg-red-400/20",
+  },
+};
+
+const INACTIVE_BTN = "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white";
+
+interface RatingButtonProps {
+  value: FeedbackRating;
+  currentRating: FeedbackRating | null;
+  icon: React.ReactNode;
+  label: string;
+  onSelect: (r: FeedbackRating) => void;
+}
+
+function RatingButton({ value, currentRating, icon, label, onSelect }: RatingButtonProps) {
+  const isActive = currentRating === value;
+  const meta = RATING_META[value];
+
+  return (
+    <motion.button
+      onClick={() => onSelect(value)}
+      whileHover={{ scale: 1.04, y: -1 }}
+      whileTap={{ scale: 0.93 }}
+      className={cn(
+        "relative flex-1 flex items-center justify-center gap-2 overflow-hidden px-4 py-2 rounded-lg transition-all",
+        isActive ? meta.active : INACTIVE_BTN,
+      )}
+    >
+      {/* Ripple de confirmation à la sélection */}
+      <AnimatePresence>
+        {isActive && (
+          <motion.span
+            key="ripple"
+            className={cn("pointer-events-none absolute inset-0 rounded-lg", meta.ripple)}
+            initial={{ opacity: 0.8, scale: 0.6 }}
+            animate={{ opacity: 0, scale: 1.4 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Icône avec micro-animation de scale quand actif */}
+      <motion.span
+        animate={isActive ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+      >
+        {icon}
+      </motion.span>
+      <span className="text-sm">{label}</span>
+    </motion.button>
+  );
+}
+
 export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetProps) {
   const [rating, setRating] = useState<FeedbackRating | null>(null);
   const [comment, setComment] = useState("");
@@ -33,10 +102,10 @@ export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetPr
 
   const handleSubmit = () => {
     if (!actionId || !rating) return;
-    
+
     submitFeedback(actionId, rating, comment || undefined, correction || undefined);
     setIsSubmitted(true);
-    
+
     setTimeout(() => {
       onDismiss?.();
     }, 2000);
@@ -52,12 +121,20 @@ export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetPr
   if (isSubmitted) {
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ type: "spring", stiffness: 400, damping: 20 }}
         className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg"
       >
-        <CheckCircle size={16} className="text-emerald-400" />
+        {/* Checkmark pop */}
+        <motion.span
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 18, delay: 0.1 }}
+        >
+          <CheckCircle size={16} className="text-emerald-400" />
+        </motion.span>
         <span className="text-sm text-emerald-400">Merci pour votre retour !</span>
       </motion.div>
     );
@@ -80,54 +157,39 @@ export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetPr
             <p className="text-xs text-white/50">Votre retour améliore QGISAI+</p>
           </div>
         </div>
-        <button
+        <motion.button
           onClick={onDismiss}
+          whileHover={{ scale: 1.1, rotate: 90 }}
+          whileTap={{ scale: 0.9 }}
           className="p-1 hover:bg-white/10 rounded transition-colors"
         >
           <X size={16} className="text-white/40" />
-        </button>
+        </motion.button>
       </div>
 
       {/* Rating buttons */}
       <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => handleRating("helpful")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all",
-            rating === "helpful"
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          <ThumbsUp size={16} />
-          <span className="text-sm">Utile</span>
-        </button>
-        
-        <button
-          onClick={() => handleRating("needs-improvement")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all",
-            rating === "needs-improvement"
-              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          <AlertCircle size={16} />
-          <span className="text-sm">À améliorer</span>
-        </button>
-        
-        <button
-          onClick={() => handleRating("not-helpful")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all",
-            rating === "not-helpful"
-              ? "bg-red-500/20 text-red-400 border border-red-500/40"
-              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          <ThumbsDown size={16} />
-          <span className="text-sm">Pas utile</span>
-        </button>
+        <RatingButton
+          value="helpful"
+          currentRating={rating}
+          icon={<ThumbsUp size={16} />}
+          label="Utile"
+          onSelect={handleRating}
+        />
+        <RatingButton
+          value="needs-improvement"
+          currentRating={rating}
+          icon={<AlertCircle size={16} />}
+          label="À améliorer"
+          onSelect={handleRating}
+        />
+        <RatingButton
+          value="not-helpful"
+          currentRating={rating}
+          icon={<ThumbsDown size={16} />}
+          label="Pas utile"
+          onSelect={handleRating}
+        />
       </div>
 
       {/* Details form */}
@@ -150,7 +212,7 @@ export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetPr
                 className="w-full h-16 px-3 py-2 bg-gray-800 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500/50 resize-none"
               />
             </div>
-            
+
             <div>
               <label className="block text-xs text-white/60 mb-1">
                 Que vouliez-vous vraiment ? (optionnel)
@@ -168,19 +230,26 @@ export default function FeedbackWidget({ actionId, onDismiss }: FeedbackWidgetPr
 
       {/* Submit button */}
       <div className="flex justify-end">
-        <button
+        <motion.button
           onClick={handleSubmit}
           disabled={!rating}
+          whileHover={rating ? { scale: 1.04, y: -1 } : {}}
+          whileTap={rating ? { scale: 0.95 } : {}}
           className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
             rating
               ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600"
-              : "bg-white/10 text-white/40 cursor-not-allowed"
+              : "bg-white/10 text-white/40 cursor-not-allowed",
           )}
         >
-          <Send size={14} />
+          <motion.span
+            animate={rating ? { x: [0, 2, 0] } : { x: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            <Send size={14} />
+          </motion.span>
           Envoyer
-        </button>
+        </motion.button>
       </div>
     </motion.div>
   );
@@ -219,7 +288,7 @@ export const useActionFeedback = () => {
     dismissFeedback,
     FeedbackComponent: showFeedback ? (
       <FeedbackWidget
-        actionId={currentActionId || undefined}
+        actionId={currentActionId ?? undefined}
         onDismiss={dismissFeedback}
       />
     ) : null,

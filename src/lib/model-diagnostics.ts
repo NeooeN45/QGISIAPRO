@@ -7,6 +7,7 @@ import {
   DEFAULT_OPENROUTER_FREE_COMPAT_PLANNER_MODEL,
   getActiveModel,
   getConfiguredGeminiApiKey,
+  getConfiguredNvidiaApiKey,
   getConfiguredOpenRouterApiKey,
 } from "./settings";
 
@@ -372,6 +373,81 @@ export async function probeOpenRouterModel(
   };
 }
 
+export async function probeNvidiaModel(
+  settings: AppSettings,
+  signal?: AbortSignal,
+): Promise<ModelProbeResult> {
+  const startedAt = getNow();
+  const apiKey = settings.nvidiaApiKey.trim() || getConfiguredNvidiaApiKey();
+  const model = getActiveModel(settings);
+  const endpoint = settings.nvidiaEndpoint;
+
+  if (!apiKey) {
+    return {
+      checkedAt: new Date().toISOString(),
+      endpoint,
+      latencyMs: roundLatency(getNow() - startedAt),
+      model,
+      ok: false,
+      preview: "Aucune cle API NVIDIA NIM configuree.",
+      provider: "nvidia",
+    };
+  }
+
+  try {
+    const response = await fetch(`${endpoint}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "Ping" }],
+        max_tokens: 5,
+      }),
+      signal,
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        checkedAt: new Date().toISOString(),
+        endpoint,
+        latencyMs: roundLatency(getNow() - startedAt),
+        model,
+        ok: false,
+        preview:
+          payload.error?.message ||
+          `Erreur NVIDIA NIM (${response.status}).`,
+        provider: "nvidia",
+      };
+    }
+
+    return {
+      checkedAt: new Date().toISOString(),
+      endpoint,
+      latencyMs: roundLatency(getNow() - startedAt),
+      model,
+      ok: true,
+      preview:
+        payload.choices?.[0]?.message?.content?.trim() || "NVIDIA NIM joignable.",
+      provider: "nvidia",
+    };
+  } catch (error) {
+    return {
+      checkedAt: new Date().toISOString(),
+      endpoint,
+      latencyMs: roundLatency(getNow() - startedAt),
+      model,
+      ok: false,
+      preview: error instanceof Error ? error.message : "Erreur inconnue NVIDIA NIM.",
+      provider: "nvidia",
+    };
+  }
+}
+
 export async function probeActiveProvider(
   settings: AppSettings,
   signal?: AbortSignal,
@@ -382,6 +458,10 @@ export async function probeActiveProvider(
 
   if (settings.provider === "google") {
     return probeGeminiModel(settings, signal);
+  }
+
+  if (settings.provider === "nvidia") {
+    return probeNvidiaModel(settings, signal);
   }
 
   return probeOpenRouterModel(settings, getActiveModel(settings), signal);

@@ -9,6 +9,7 @@ import { QGIS_TOOLS_REFERENCE_SHORT } from "./qgis-tools-reference";
 import {
   AppSettings,
   getConfiguredGeminiApiKey,
+  getConfiguredNvidiaApiKey,
   getConfiguredOpenRouterApiKey,
 } from "./settings";
 import { orchestrateResponse } from "./multi-model-orchestrator";
@@ -644,6 +645,26 @@ export async function repairPythonScriptWithProvider(
     return response.text || "Reponse vide de Gemini.";
   }
 
+  if (settings.provider === "nvidia") {
+    const apiKey = settings.nvidiaApiKey.trim() || getConfiguredNvidiaApiKey();
+    if (!apiKey) {
+      throw new Error("Aucune cle API NVIDIA NIM n'est configuree.");
+    }
+    const messages: ChatMessage[] = [
+      { role: "system", content: PYQGIS_REPAIR_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ];
+    const full = await gatewayStreamToText(
+      {
+        model: settings.nvidiaModel,
+        messages,
+        api_keys: { nvidia_nim: apiKey },
+        signal: input.signal,
+      },
+    );
+    return full || "Reponse vide de NVIDIA NIM.";
+  }
+
   try {
     return await generateOpenRouterRepairReply(settings, prompt, input.signal);
   } catch (error) {
@@ -835,6 +856,54 @@ async function generateViaGateway(
   }
 }
 
+async function generateViaNvidia(
+  input: GenerateAssistantReplyInput,
+): Promise<string> {
+  const thinkingStore = useThinkingStore.getState();
+  const streamingStore = useStreamingStore.getState();
+  const { settings } = input;
+
+  const apiKey = settings.nvidiaApiKey.trim() || getConfiguredNvidiaApiKey();
+  if (!apiKey) {
+    throw new Error("Aucune cle API NVIDIA NIM n'est configuree.");
+  }
+
+  try {
+    thinkingStore.setPhase("ANALYZING_INTENT", {
+      message: "Connexion a NVIDIA NIM...",
+      subMessage: `Modele : ${settings.nvidiaModel}`,
+    });
+    streamingStore.startStreaming(createMessageId());
+    thinkingStore.setPhase("STREAMING_RESPONSE", { modelName: settings.nvidiaModel });
+
+    const messages: ChatMessage[] = [
+      { role: "system", content: DEFAULT_LOCAL_SYSTEM_PROMPT },
+      { role: "user", content: input.prompt },
+    ];
+
+    const full = await gatewayStreamToText(
+      {
+        model: settings.nvidiaModel,
+        messages,
+        api_keys: { nvidia_nim: apiKey },
+        signal: input.signal,
+      },
+      (delta) => streamingStore.addChunk(delta),
+    );
+
+    setTimeout(() => {
+      thinkingStore.reset();
+      streamingStore.completeStreaming();
+    }, 300);
+
+    return full || "Operation terminee, sans message complementaire.";
+  } catch (error) {
+    thinkingStore.reset();
+    streamingStore.completeStreaming();
+    throw error;
+  }
+}
+
 export async function generateAssistantReply(
   input: GenerateAssistantReplyInput,
 ): Promise<string> {
@@ -949,6 +1018,10 @@ export async function generateAssistantReply(
     });
 
     return response.text || "Operation SIG terminee, sans message complementaire.";
+  }
+
+  if (settings.provider === "nvidia") {
+    return generateViaNvidia(input);
   }
 
   try {

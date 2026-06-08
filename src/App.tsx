@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Layers, Settings as SettingsIcon, Code2, Sparkles, RefreshCw, FileText } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
 import { Toaster, toast } from "sonner";
 
@@ -910,7 +911,7 @@ export default function App() {
     }
   }, [setIsLoading]);
 
-  // Initialize conversations
+  // Initialize conversations — marks app as ready once the first message is built
   useEffect(() => {
     let cancelled = false;
 
@@ -918,6 +919,7 @@ export default function App() {
       const welcomeMsg = await buildAssistantMessage("welcome");
       if (!cancelled) {
         convStore.getState().initialize(welcomeMsg);
+        setIsAppReady(true);
       }
     };
 
@@ -966,6 +968,9 @@ export default function App() {
       window.clearInterval(qgisInterval);
     };
   }, [refreshLayers, setIsQgisConnected]);
+
+  // True once the initial welcome message has been built — drives the loading screen
+  const [isAppReady, setIsAppReady] = useState(false);
 
   // State pour le wizard d'installation Ollama
   const [showInstallationWizard, setShowInstallationWizard] = useState(false);
@@ -1071,73 +1076,146 @@ export default function App() {
         Aller au contenu principal
       </a>
       <div id="main-content" className="flex h-screen w-full overflow-hidden">
-        <Toaster position="top-right" theme={settings.theme === "light" ? "light" : "dark"} />
+        <Toaster
+          position="bottom-right"
+          theme={settings.theme === "light" ? "light" : "dark"}
+          richColors
+          closeButton
+        />
+
+        {/* TODO: intégrer GeoParticlesBackground */}
+        {/* {showParticles && <GeoParticlesBackground isDark={settings.theme !== "light"} />} */}
+
+        {/* Elegant loading screen — visible until conversations are initialized */}
+        <AnimatePresence>
+          {!isAppReady && (
+            <motion.div
+              key="app-loading"
+              className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-[#131314]"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              aria-label="Chargement de l'application"
+            >
+              <motion.div
+                className="flex flex-col items-center gap-6"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+              >
+                {/* Animated logo */}
+                <motion.div
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/25"
+                  animate={{ scale: [1, 1.06, 1], opacity: [0.7, 1, 0.7] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <Sparkles size={28} className="text-emerald-400" />
+                </motion.div>
+
+                {/* Spinner dots */}
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      className="h-1.5 w-1.5 rounded-full bg-emerald-500/60"
+                      animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }}
+                      transition={{
+                        duration: 1.2,
+                        repeat: Infinity,
+                        delay: i * 0.2,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <p className="text-xs text-white/25 font-mono tracking-widest uppercase">
+                  Initialisation…
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <TaskStatusPanel />
-        
+
         {showIntroAnimation && (
           <IntroAnimation
             onComplete={() => setShowIntroAnimation(false)}
             isFirstTime={!localStorage.getItem("qgisia-intro-seen")}
           />
         )}
-      
-      {showInstallationWizard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#131314] p-6 shadow-2xl">
-            <InstallationWizard
-              onComplete={(selectedModel) => {
-                setShowInstallationWizard(false);
-                toast.success(`Modèle ${selectedModel} installé avec succès`);
-              }}
-              onCancel={() => setShowInstallationWizard(false)}
-            />
+
+        {showInstallationWizard && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#131314] p-6 shadow-2xl">
+              <InstallationWizard
+                onComplete={(selectedModel) => {
+                  setShowInstallationWizard(false);
+                  toast.success(`Modèle ${selectedModel} installé avec succès`);
+                }}
+                onCancel={() => setShowInstallationWizard(false)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showOllamaWizard && (
-        <OllamaSetupWizard
-          onComplete={(model) => {
-            handleOllamaWizardComplete(model);
-            setShowOllamaWizard(false);
-          }}
-          onClose={() => setShowOllamaWizard(false)}
-        />
-      )}
+        {showOllamaWizard && (
+          <OllamaSetupWizard
+            onComplete={(model) => {
+              handleOllamaWizardComplete(model);
+              setShowOllamaWizard(false);
+            }}
+            onClose={() => setShowOllamaWizard(false)}
+          />
+        )}
 
-      {showCommandPalette && (
-        <CommandPalette
-          commands={commands}
-          onClose={() => setShowCommandPalette(false)}
-        />
-      )}
+        {showCommandPalette && (
+          <CommandPalette
+            commands={commands}
+            onClose={() => setShowCommandPalette(false)}
+          />
+        )}
 
-      <Chat
-        activeConversation={activeConversation}
-        activeConversationId={activeConversationId}
-        conversations={conversations}
-        isLoading={isLoading}
-        isRefreshingLayers={isRefreshingLayers}
-        layers={layers}
-        messages={activeConversation?.messages || []}
-        onCreateConversation={createNewConversation}
-        onDeleteConversation={handleDeleteConversation}
-        onRefreshLayers={refreshLayers}
-        onSelectConversation={(id: string) => convStore.getState().select(id)}
-        onSendMessage={handleSendMessage}
-        onSetLayerOpacity={handleSetLayerOpacity}
-        onSetLayerContextScope={handleSetLayerContextScope}
-        onSetLayerVisibility={handleSetLayerVisibility}
-        onStopGeneration={stopGeneration}
-        onToggleLayerSelection={handleToggleLayerSelection}
-        onUpdateConversationMode={handleSetConversationMode}
-        onUpdateSettings={handleUpdateSettings}
-        onZoomToLayer={handleZoomToLayer}
-        conversationMode={activeConversation?.mode || "chat"}
-        layerContextById={activeConversation?.layerContextById || {}}
-        selectedLayerIds={activeConversation?.selectedLayerIds || []}
-        settings={settings}
-      />
+        {/* Chat animates in once app is ready; transitions between welcome and active conversation */}
+        <AnimatePresence mode="wait">
+          {isAppReady && (
+            <motion.div
+              key="chat-shell"
+              className="flex h-full w-full"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <Chat
+                activeConversation={activeConversation}
+                activeConversationId={activeConversationId}
+                conversations={conversations}
+                isLoading={isLoading}
+                isRefreshingLayers={isRefreshingLayers}
+                layers={layers}
+                messages={activeConversation?.messages || []}
+                onCreateConversation={createNewConversation}
+                onDeleteConversation={handleDeleteConversation}
+                onRefreshLayers={refreshLayers}
+                onSelectConversation={(id: string) => convStore.getState().select(id)}
+                onSendMessage={handleSendMessage}
+                onSetLayerOpacity={handleSetLayerOpacity}
+                onSetLayerContextScope={handleSetLayerContextScope}
+                onSetLayerVisibility={handleSetLayerVisibility}
+                onStopGeneration={stopGeneration}
+                onToggleLayerSelection={handleToggleLayerSelection}
+                onUpdateConversationMode={handleSetConversationMode}
+                onUpdateSettings={handleUpdateSettings}
+                onZoomToLayer={handleZoomToLayer}
+                conversationMode={activeConversation?.mode || "chat"}
+                layerContextById={activeConversation?.layerContextById || {}}
+                selectedLayerIds={activeConversation?.selectedLayerIds || []}
+                settings={settings}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       </>
   );

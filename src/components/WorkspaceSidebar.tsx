@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 // Panneaux Devin — chargés en lazy pour ne pas alourdir le bundle initial
 // IMPLÉMENTÉ PAR DEVIN CLI (Cognition AI) — Superviseur : Claude Code 4.8 — 2026-06-08
@@ -910,7 +911,14 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                 ? "text-blue-500 dark:text-blue-400 border-blue-500/30 bg-blue-500/10"
                 : "text-emerald-500 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
           return (
-            <div key={layer.id} className="group rounded-2xl border border-gray-200 dark:border-white/[0.07] bg-white/70 dark:bg-white/[0.02] p-3.5 transition-all hover:border-gray-300 dark:hover:border-white/[0.06] hover:bg-white dark:hover:bg-white/[0.04]">
+            <motion.div
+              key={layer.id}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              whileHover={{ y: -1, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
+              className="group rounded-2xl border border-gray-200 dark:border-white/[0.07] bg-white/70 dark:bg-white/[0.02] p-3.5 transition-all duration-150 hover:border-gray-300 dark:hover:border-white/[0.06] hover:bg-white dark:hover:bg-white/[0.04] hover:shadow-sm dark:hover:shadow-[0_1px_3px_rgba(255,255,255,0.03)]">
+            
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1056,7 +1064,7 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
                   Filtre: {layer.subsetString}
                 </div>
               ) : null}
-            </div>
+            </motion.div>
           );
         })
       )}
@@ -1857,14 +1865,14 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
       <div className={cn("flex gap-1.5 px-3 py-2.5", !isOpen && "flex-col px-2 gap-2")}>
         {[
           { id: "history" as SidebarTab, label: "Historique", Icon: MessageSquare, badge: conversations.length,
-            active: "border-blue-500/40 bg-gradient-to-br from-blue-500/15 to-blue-600/8 text-blue-600 dark:text-blue-300 shadow-md shadow-blue-500/10" },
+            accent: "blue" },
           { id: "layers" as SidebarTab, label: "Couches", Icon: Database, badge: layers.length,
-            active: "border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 to-emerald-600/8 text-emerald-600 dark:text-emerald-300 shadow-md shadow-emerald-500/10" },
+            accent: "emerald" },
           { id: "services" as SidebarTab, label: "Services", Icon: Network, badge: null,
-            active: "border-cyan-500/40 bg-gradient-to-br from-cyan-500/15 to-cyan-600/8 text-cyan-600 dark:text-cyan-300 shadow-md shadow-cyan-500/10" },
+            accent: "cyan" },
           { id: "tools" as SidebarTab, label: "Outils", Icon: Wrench, badge: null,
-            active: "border-violet-500/40 bg-gradient-to-br from-violet-500/15 to-violet-600/8 text-violet-600 dark:text-violet-300 shadow-md shadow-violet-500/10" },
-        ].map(({ id, label, Icon, badge, active }) => (
+            accent: "violet" },
+        ].map(({ id, label, Icon, badge, accent }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -1872,7 +1880,7 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
               "relative flex items-center gap-2 rounded-2xl border px-3 py-2 text-[12px] font-semibold transition-all duration-200",
               isOpen ? "flex-1" : "w-full justify-center py-3",
               activeTab === id
-                ? active
+                ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300 shadow-sm"
                 : "border-gray-200 dark:border-white/[0.06] bg-gray-100/60 dark:bg-white/[0.03] text-gray-500 dark:text-white/35 hover:bg-gray-100 dark:hover:bg-white/[0.06] hover:text-gray-700 dark:hover:text-white/60",
             )}
             title={label}

@@ -14,6 +14,7 @@ const AiSettingsModal = lazy(() => import("./SettingsModal"));
 const PluginSetupModalComponent = lazy(() => import("./PluginSetupModal"));
 const LayerDiagnosticsModalComponent = lazy(() => import("./LayerDiagnosticsModal"));
 const WorkspaceSidebar = lazy(() => import("./WorkspaceSidebar"));
+const GeoParticlesBackground = lazy(() => import("./GeoParticlesBackground"));
 import ChatHeader from "./ChatHeader";
 import ChatInputArea from "./ChatInput";
 import WelcomeScreen from "./WelcomeScreen";
@@ -470,6 +471,9 @@ export default function Chat(props: ChatProps) {
   return (
     <div className="flex h-full w-full overflow-hidden bg-gray-50 dark:bg-[#131314] text-gray-800 dark:text-white">
       <div className="bg-mesh" />
+      <Suspense fallback={null}>
+        <GeoParticlesBackground isDark={true} />
+      </Suspense>
       <Suspense fallback={
         <div className="flex h-[84px] w-[396px] items-center justify-center border-r border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
           <div className="text-gray-700 dark:text-white/70">Chargement...</div>
@@ -564,8 +568,13 @@ export default function Chat(props: ChatProps) {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 pb-60 pt-4 md:px-6 chat-scrollbar"
+          className="relative flex-1 overflow-y-auto px-4 pb-60 pt-4 md:px-6 chat-scrollbar"
         >
+          {/* Fade gradient top */}
+          <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-8 bg-gradient-to-b from-[var(--background)] to-transparent" />
+          {/* Fade gradient bottom */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-8 bg-gradient-to-t from-[var(--background)] to-transparent" />
+
           <div className="mx-auto w-full max-w-4xl">
             {messages.length <= 1 && !isLoading ? (
               <WelcomeScreen onSendMessage={(msg) => void onSendMessage(msg)} layers={layers} />
@@ -617,18 +626,27 @@ export default function Chat(props: ChatProps) {
         <AnimatePresence>
           {showScrollButton && (
             <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 10 }}
               onClick={() =>
                 scrollRef.current?.scrollTo({
                   top: scrollRef.current.scrollHeight,
                   behavior: "smooth",
                 })
               }
-              className="absolute bottom-40 right-8 z-30 rounded-full border border-gray-300 dark:border-gray-700 bg-blue-600 p-3 text-white shadow-2xl transition-all hover:bg-blue-500"
+              className="absolute bottom-40 right-8 z-30 rounded-full border border-gray-300 bg-blue-600 p-3 text-white shadow-2xl transition-colors hover:bg-blue-500 dark:border-gray-700"
             >
-              <ChevronDown size={20} />
+              <motion.div
+                animate={{ y: [0, 4, 0] }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <ChevronDown size={20} />
+              </motion.div>
             </motion.button>
           )}
         </AnimatePresence>

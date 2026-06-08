@@ -42,16 +42,20 @@ import {
   GEMINI_MODEL_PRESETS,
   getActiveModel,
   getConfiguredGeminiApiKey,
+  getConfiguredNvidiaApiKey,
   getConfiguredOpenRouterApiKey,
   getOpenRouterStackPresetId,
   hasConfiguredGeminiApiKey,
+  hasConfiguredNvidiaApiKey,
   hasConfiguredOpenRouterApiKey,
   LOCAL_MODEL_PRESETS,
+  NVIDIA_MODEL_PRESETS,
   normalizeSettings,
   OPENROUTER_ROLE_PRESETS,
   OPENROUTER_STACK_PRESETS,
   validateSettings,
   validateGeminiKeyFormat,
+  validateNvidiaKeyFormat,
   validateOpenRouterKeyFormat,
   type ApiKeyStatus,
 } from "../lib/settings";
@@ -77,7 +81,7 @@ import { getSystemSpecs } from "../lib/qgis";
 interface SettingsModalProps {
   localSettings: AppSettings;
   onClose: () => void;
-  onPasteApiKey: (target: "google" | "openrouter") => void | Promise<void>;
+  onPasteApiKey: (target: "google" | "openrouter" | "nvidia") => void | Promise<void>;
   onReset: () => void;
   onSave: () => void;
   setLocalSettings: Dispatch<SetStateAction<AppSettings>>;
@@ -244,6 +248,7 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
+  const [showNvidiaKey, setShowNvidiaKey] = useState(false);
   const [activeTab, setActiveTab] = useState<"provider" | "gateway" | "config" | "execution" | "diagnostics">("provider");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const defaults = new Set<string>(["provider"]);
@@ -251,6 +256,7 @@ export default function SettingsModal({
     if (p === "google") defaults.add("google-config");
     if (p === "local") defaults.add("local-config");
     if (p === "openrouter") defaults.add("openrouter-config");
+    if (p === "nvidia") defaults.add("nvidia-config");
     defaults.add("openrouter-stack");
     defaults.add("generation-params");
     defaults.add("config-summary");
@@ -505,8 +511,10 @@ export default function SettingsModal({
   );
   const envGeminiApiKey = getConfiguredGeminiApiKey();
   const envOpenRouterApiKey = getConfiguredOpenRouterApiKey();
+  const envNvidiaApiKey = getConfiguredNvidiaApiKey();
   const hasEnvGeminiApiKey = hasConfiguredGeminiApiKey();
   const hasEnvOpenRouterApiKey = hasConfiguredOpenRouterApiKey();
+  const hasEnvNvidiaApiKey = hasConfiguredNvidiaApiKey();
 
   const settingsIssues = validateSettings(normalizedLocalSettings, {
     hasGeminiEnvKey: hasEnvGeminiApiKey,
@@ -523,6 +531,11 @@ export default function SettingsModal({
   const openRouterKeySource = normalizedLocalSettings.openrouterApiKey
     ? "local"
     : hasEnvOpenRouterApiKey
+      ? "env"
+      : "missing";
+  const nvidiaKeySource = normalizedLocalSettings.nvidiaApiKey
+    ? "local"
+    : hasEnvNvidiaApiKey
       ? "env"
       : "missing";
 
@@ -586,10 +599,11 @@ export default function SettingsModal({
         <Cpu size={12} />
         Fournisseur principal
       </label>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {renderProviderButton("local", "Local", "Ollama", "Exécution locale sans cloud.", "emerald")}
         {renderProviderButton("google", "Google", "Gemini", "IA générative Google.", "blue")}
         {renderProviderButton("openrouter", "OpenRouter", "Multi", "Stack multi-agent avancée.", "purple")}
+        {renderProviderButton("nvidia", "NVIDIA NIM", "NIM", "Free tier 40 req/min — Nemotron, Llama, Qwen via NVIDIA.", "cyan")}
       </div>
     </div>
   );
@@ -601,9 +615,11 @@ export default function SettingsModal({
       next.delete("google-config");
       next.delete("local-config");
       next.delete("openrouter-config");
+      next.delete("nvidia-config");
       if (id === "google") next.add("google-config");
       if (id === "local") next.add("local-config");
       if (id === "openrouter") next.add("openrouter-config");
+      if (id === "nvidia") next.add("nvidia-config");
       return next;
     });
   };
@@ -784,6 +800,10 @@ export default function SettingsModal({
     ? validateOpenRouterKeyFormat(normalizedLocalSettings.openrouterApiKey)
     : openRouterKeySource === "env" ? "valid" : "empty";
 
+  const nvidiaKeyStatus: ApiKeyStatus = normalizedLocalSettings.nvidiaApiKey
+    ? validateNvidiaKeyFormat(normalizedLocalSettings.nvidiaApiKey)
+    : nvidiaKeySource === "env" ? "valid" : "empty";
+
   const renderKeyStatusBadge = (status: ApiKeyStatus) => {
     if (status === "valid") return (
       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
@@ -878,6 +898,96 @@ export default function SettingsModal({
                 <p className="text-sm font-semibold">{preset.label}</p>
                 {preset.tags?.map(tag => (
                   <span key={tag} className="rounded-full border border-blue-500/25 bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-300 uppercase tracking-wide">{tag}</span>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-white/45">{preset.description}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderNvidiaApiKeySection = () => (
+    <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/6 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <KeyRound size={16} className="text-cyan-300" />
+            Clé NVIDIA NIM
+            {renderKeyStatusBadge(nvidiaKeyStatus)}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-white/50">
+            Source:{" "}
+            <strong className="text-white">
+              {nvidiaKeySource === "local" ? "clé locale" : nvidiaKeySource === "env" ? "variable d'environnement" : "non configurée"}
+            </strong>
+            {" — "}
+            <span className="text-white/40">Free tier 40 req/min via build.nvidia.com</span>
+          </p>
+        </div>
+        <a
+          href="https://build.nvidia.com/"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition-all hover:bg-cyan-500/16"
+        >
+          Developer
+          <ExternalLink size={13} />
+        </a>
+      </div>
+      <div className="mt-4">
+        <SecretInput
+          value={normalizedLocalSettings.nvidiaApiKey}
+          placeholder={
+            nvidiaKeySource === "env"
+              ? maskSecret(envNvidiaApiKey)
+              : "nvapi-... (clé NVIDIA NIM)"
+          }
+          visible={showNvidiaKey}
+          onChange={(value) =>
+            setLocalSettings((current) => ({
+              ...current,
+              nvidiaApiKey: value,
+            }))
+          }
+          onPaste={() => void onPasteApiKey("nvidia" as any)}
+          onToggle={() => setShowNvidiaKey((current) => !current)}
+        />
+      </div>
+      <div className="mt-4">
+        <label className="mb-2 block text-xs font-medium text-white/70">
+          Modèle NVIDIA NIM
+        </label>
+        <div className="mt-2 grid gap-3 md:grid-cols-2">
+          {NVIDIA_MODEL_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() =>
+                setLocalSettings((current) => ({
+                  ...current,
+                  nvidiaModel: preset.id,
+                  model:
+                    normalizeSettings({
+                      ...current,
+                      nvidiaModel: preset.id,
+                    }).provider === "nvidia"
+                      ? preset.id
+                      : current.model,
+                }))
+              }
+              className={cn(
+                "rounded-2xl border p-4 text-left transition-all",
+                normalizedLocalSettings.nvidiaModel === preset.id
+                  ? "border-cyan-500/35 bg-cyan-500/12 text-white"
+                  : "border-white/10 bg-black/15 text-white/60 hover:bg-white/8",
+              )}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-semibold">{preset.label}</p>
+                {preset.tags?.map(tag => (
+                  <span key={tag} className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-cyan-300 uppercase tracking-wide">{tag}</span>
                 ))}
               </div>
               <p className="mt-1 text-xs text-white/45">{preset.description}</p>
@@ -1066,10 +1176,11 @@ export default function SettingsModal({
                   <Cpu size={12} />
                   Fournisseur principal
                 </label>
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                   {renderProviderButton("local", "Local", "Ollama", "Exécution locale sans cloud.", "emerald")}
                   {renderProviderButton("google", "Google", "Gemini", "IA générative Google.", "blue")}
                   {renderProviderButton("openrouter", "OpenRouter", "Multi", "Stack multi-agent avancée.", "purple")}
+                  {renderProviderButton("nvidia", "NVIDIA NIM", "NIM", "Free tier 40 req/min — Nemotron, Llama, Qwen via NVIDIA.", "cyan")}
                 </div>
               </div>
 
@@ -1080,6 +1191,14 @@ export default function SettingsModal({
                 <KeyRound size={20} />,
                 renderGoogleApiKeySection(),
                 "blue"
+              )}
+
+              {normalizedLocalSettings.provider === "nvidia" && renderAccordionSection(
+                "nvidia-config",
+                "Configuration NVIDIA NIM",
+                <KeyRound size={20} />,
+                renderNvidiaApiKeySection(),
+                "cyan"
               )}
 
               {normalizedLocalSettings.provider === "local" && renderAccordionSection(

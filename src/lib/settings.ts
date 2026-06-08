@@ -1,4 +1,4 @@
-export type AiProvider = "google" | "local" | "openrouter";
+export type AiProvider = "google" | "local" | "openrouter" | "nvidia";
 export type OpenRouterAgentMode = "single" | "multi";
 export type OpenRouterExecutionMode = "draft" | "tools";
 export type OpenRouterDataCollectionPolicy = "allow" | "deny";
@@ -31,6 +31,9 @@ export interface AppSettings {
   openrouterReviewerModel: string;
   openrouterRetrieverModel: string;
   openrouterExecutorModel: string;
+  nvidiaApiKey: string;
+  nvidiaEndpoint: string;
+  nvidiaModel: string;
   autoExecutePythonScripts: boolean;
   autoRepairPythonScripts: boolean;
   autoRepairMaxAttempts: number;
@@ -92,6 +95,10 @@ export const DEFAULT_OPENROUTER_FREE_COMPAT_PLANNER_MODEL =
   "arcee-ai/trinity-large-preview:free";
 export const DEFAULT_OPENROUTER_FREE_COMPAT_EXECUTOR_MODEL =
   "arcee-ai/trinity-mini:free";
+
+export const DEFAULT_NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1";
+export const DEFAULT_NVIDIA_MODEL =
+  "nvidia/nemotron-3-super-120b-a12b";
 
 const LEGACY_DEFAULT_GOOGLE_MODEL = DEFAULT_GOOGLE_MODEL;
 
@@ -557,6 +564,79 @@ export const LOCAL_MODEL_PRESETS: ModelPreset[] = [
  * Modèles HuggingFace API disponibles (comme Gemma 4)
  * Ces modèles nécessitent une clé API HuggingFace
  */
+export const NVIDIA_MODEL_PRESETS: ModelPreset[] = [
+  {
+    id: "nvidia/nemotron-3-super-120b-a12b",
+    label: "Nemotron 3 Super 120B",
+    description: "Cerveau generaliste NVIDIA — qualite + rapidite (510ms valide).",
+    category: "advanced",
+    tags: ["recommande", "nvidia"],
+  },
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b",
+    label: "Nemotron 3 Ultra 550B",
+    description: "Raisonnement spatial lourd — qualite maximale (~100s).",
+    category: "advanced",
+    tags: ["CoT", "nvidia"],
+  },
+  {
+    id: "nvidia/nemotron-3-nano-30b-a3b",
+    label: "Nemotron 3 Nano 30B",
+    description: "Bon compromis qualite/cout, free tier.",
+    category: "standard",
+    tags: ["nvidia", "gratuit"],
+  },
+  {
+    id: "nvidia/nemotron-mini-4b-instruct",
+    label: "Nemotron Mini 4B",
+    description: "Routage d'intention ultra-rapide (181ms valide).",
+    category: "lightweight",
+    tags: ["rapide", "nvidia", "gratuit"],
+  },
+  {
+    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    label: "Nemotron 3 Omni 30B",
+    description: "Vision SIG generale — omni-modal (399ms valide).",
+    category: "standard",
+    tags: ["vision", "nvidia", "gratuit"],
+  },
+  {
+    id: "qwen/qwen3-coder-480b-a35b-instruct",
+    label: "Qwen3 Coder 480B (NVIDIA)",
+    description: "Generation de code PyQGIS — agentique (9.5s valide).",
+    category: "code",
+    tags: ["pyqgis", "nvidia"],
+  },
+  {
+    id: "meta/llama-3.3-70b-instruct",
+    label: "Llama 3.3 70B (NVIDIA)",
+    description: "Meta via NIM — generaliste fiable.",
+    category: "standard",
+    tags: ["nvidia", "gratuit"],
+  },
+  {
+    id: "meta/llama-3.2-90b-vision-instruct",
+    label: "Llama 3.2 90B Vision (NVIDIA)",
+    description: "Vision haute qualite via NIM.",
+    category: "advanced",
+    tags: ["vision", "nvidia", "gratuit"],
+  },
+  {
+    id: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+    label: "Nemotron Nano VL 8B",
+    description: "Documents, legendes, PDF — rapide (253ms valide).",
+    category: "lightweight",
+    tags: ["vision", "nvidia", "gratuit"],
+  },
+  {
+    id: "mistralai/mistral-large-3-675b-instruct-2512",
+    label: "Mistral Large 3 675B (NVIDIA)",
+    description: "Extraction JSON structuree — fiable.",
+    category: "advanced",
+    tags: ["nvidia"],
+  },
+];
+
 export const HUGGINGFACE_MODEL_PRESETS = [
   {
     id: "google/gemma-4-4b-it",
@@ -812,10 +892,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   numGpu: -1, // -1 signifie "Auto" pour Ollama
   keepAlive: "1h",
   systemPromptOverride: "",
+  nvidiaApiKey: "",
+  nvidiaEndpoint: DEFAULT_NVIDIA_ENDPOINT,
+  nvidiaModel: DEFAULT_NVIDIA_MODEL,
 };
 
 function toProvider(value: string | null): AiProvider | undefined {
-  if (value === "google" || value === "local" || value === "openrouter") {
+  if (value === "google" || value === "local" || value === "openrouter" || value === "nvidia") {
     return value;
   }
 
@@ -826,7 +909,7 @@ function selectModelForProvider(
   provider: AiProvider,
   settings: Pick<
     AppSettings,
-    "googleModel" | "localModel" | "openrouterExecutorModel"
+    "googleModel" | "localModel" | "openrouterExecutorModel" | "nvidiaModel"
   >,
 ): string {
   if (provider === "google") {
@@ -837,12 +920,16 @@ function selectModelForProvider(
     return settings.openrouterExecutorModel;
   }
 
+  if (provider === "nvidia") {
+    return settings.nvidiaModel;
+  }
+
   return settings.localModel;
 }
 
 function selectApiKeyForProvider(
   provider: AiProvider,
-  settings: Pick<AppSettings, "googleApiKey" | "openrouterApiKey">,
+  settings: Pick<AppSettings, "googleApiKey" | "openrouterApiKey" | "nvidiaApiKey">,
 ): string {
   if (provider === "google") {
     return settings.googleApiKey;
@@ -850,6 +937,10 @@ function selectApiKeyForProvider(
 
   if (provider === "openrouter") {
     return settings.openrouterApiKey;
+  }
+
+  if (provider === "nvidia") {
+    return settings.nvidiaApiKey;
   }
 
   return "";
@@ -902,6 +993,10 @@ function loadSettingsFromUrl(): Partial<AppSettings> {
     overrides.openrouterEndpoint = endpoint || baseUrl;
   }
 
+  if (provider === "nvidia" && model) {
+    overrides.nvidiaModel = model;
+  }
+
   return overrides;
 }
 
@@ -920,6 +1015,12 @@ export function validateOpenRouterKeyFormat(key: string): ApiKeyStatus {
   return /^sk-or(-v1)?-[0-9a-fA-F]{64}$/.test(key.trim()) ? "valid" : "invalid_format";
 }
 
+export function validateNvidiaKeyFormat(key: string): ApiKeyStatus {
+  if (!key.trim()) return "empty";
+  // Les clés NVIDIA NIM commencent par "nvapi-"
+  return /^nvapi-[a-zA-Z0-9_-]{30,}$/.test(key.trim()) ? "valid" : "invalid_format";
+}
+
 export function getConfiguredGeminiApiKey(): string {
   const env = import.meta.env as Record<string, string | undefined>;
   return (env.VITE_GEMINI_API_KEY || "").trim();
@@ -936,6 +1037,15 @@ export function getConfiguredOpenRouterApiKey(): string {
 
 export function hasConfiguredOpenRouterApiKey(): boolean {
   return getConfiguredOpenRouterApiKey().length > 0;
+}
+
+export function getConfiguredNvidiaApiKey(): string {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return (env.VITE_NVIDIA_API_KEY || "").trim();
+}
+
+export function hasConfiguredNvidiaApiKey(): boolean {
+  return getConfiguredNvidiaApiKey().length > 0;
 }
 
 export function getActiveModel(settings: AppSettings): string {
@@ -1016,6 +1126,13 @@ export function normalizeSettings(input: AppSettings): AppSettings {
       (provider === "openrouter" ? input.model : "") ||
       DEFAULT_OPENROUTER_EXECUTOR_MODEL
     ).trim();
+  const nvidiaApiKey = (
+    input.nvidiaApiKey ||
+    (provider === "nvidia" ? input.apiKey : "") ||
+    ""
+  ).trim();
+  const nvidiaModel = (input.nvidiaModel || (provider === "nvidia" ? input.model : "") || DEFAULT_NVIDIA_MODEL).trim();
+  const nvidiaEndpoint = (input.nvidiaEndpoint || DEFAULT_NVIDIA_ENDPOINT).trim();
 
   const normalized: AppSettings = {
     ...DEFAULT_SETTINGS,
@@ -1024,12 +1141,17 @@ export function normalizeSettings(input: AppSettings): AppSettings {
     apiKey: selectApiKeyForProvider(provider, {
       googleApiKey,
       openrouterApiKey,
+      nvidiaApiKey,
     }),
     model: selectModelForProvider(provider, {
       googleModel,
       localModel,
       openrouterExecutorModel,
+      nvidiaModel,
     }),
+    nvidiaApiKey,
+    nvidiaEndpoint,
+    nvidiaModel,
     localEndpoint,
     localModel,
     googleApiKey,
@@ -1188,6 +1310,17 @@ export function loadStoredSettings(storageKey = "geoai-settings"): AppSettings {
         (provider === "openrouter"
           ? safeParsed.model || DEFAULT_OPENROUTER_EXECUTOR_MODEL
           : DEFAULT_OPENROUTER_EXECUTOR_MODEL),
+      nvidiaApiKey:
+        safeParsed.nvidiaApiKey ||
+        (provider === "nvidia" ? safeParsed.apiKey || "" : ""),
+      nvidiaModel:
+        urlOverrides.nvidiaModel ||
+        safeParsed.nvidiaModel ||
+        (provider === "nvidia" ? safeParsed.model || DEFAULT_NVIDIA_MODEL : DEFAULT_NVIDIA_MODEL),
+      nvidiaEndpoint:
+        urlOverrides.nvidiaEndpoint ||
+        safeParsed.nvidiaEndpoint ||
+        DEFAULT_NVIDIA_ENDPOINT,
       localEndpoint:
         urlOverrides.localEndpoint ||
         safeParsed.localEndpoint ||
@@ -1242,6 +1375,18 @@ export function validateSettings(
 
     if (!isValidHttpUrl(normalized.localEndpoint)) {
       issues.push("L'endpoint local doit etre une URL HTTP valide.");
+    }
+  }
+
+  if (normalized.provider === "nvidia") {
+    if (!normalized.nvidiaApiKey.trim() && !hasConfiguredNvidiaApiKey()) {
+      issues.push("Ajoute une cle API NVIDIA ou configure VITE_NVIDIA_API_KEY.");
+    }
+    if (!normalized.nvidiaModel.trim()) {
+      issues.push("Le modele NVIDIA est requis.");
+    }
+    if (!isValidHttpUrl(normalized.nvidiaEndpoint)) {
+      issues.push("L'endpoint NVIDIA doit etre une URL HTTP valide.");
     }
   }
 

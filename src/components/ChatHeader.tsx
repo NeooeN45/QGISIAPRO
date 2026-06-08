@@ -11,6 +11,7 @@ import {
   TreePine,
   X,
 } from "lucide-react";
+import { motion } from "motion/react";
 
 import { cn } from "@/src/lib/utils";
 import { ChatConversation, ConversationMode, LayerContextScope } from "../lib/chat-history";
@@ -120,12 +121,20 @@ export default function ChatHeader({
                 {conversationTitle || "Nouvelle discussion"}
               </h1>
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                <span
-                  className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    isQgisConnected ? "bg-emerald-400 shadow-[0_0_4px_theme(colors.emerald.400)]" : "bg-amber-400",
+                <span className="relative flex h-1.5 w-1.5 items-center justify-center">
+                  {isQgisConnected ? (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_theme(colors.emerald.400)]" />
+                    </>
+                  ) : (
+                    <motion.span
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                      className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"
+                    />
                   )}
-                />
+                </span>
                 {isQgisConnected ? "QGIS" : "Attente"}
               </span>
             </div>
@@ -141,7 +150,12 @@ export default function ChatHeader({
                 )}
                 title={`Mode IA actif · modèle ${gw.defaultAlias} · statut ${gw.status}`}
               >
-                <span className={cn("h-1.5 w-1.5 rounded-full", aiDot)} />
+                <span className="relative flex h-1.5 w-1.5 items-center justify-center">
+                  {gw.status === "ready" && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                  )}
+                  <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", aiDot)} />
+                </span>
                 {aiMode.label} · {gw.defaultAlias}
               </span>
               <div className="inline-flex rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] p-0.5">
@@ -191,8 +205,10 @@ export default function ChatHeader({
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button
+          <motion.button
             onClick={() => setShowSettings(true)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 rounded-2xl border border-transparent p-2.5 text-gray-500 dark:text-[#c4c7c5] transition-all hover:border-gray-300 dark:hover:border-[#444746] hover:bg-gray-100 dark:hover:bg-[#333537] hover:text-blue-400"
             title="Paramètres IA"
             aria-label="Ouvrir les paramètres IA"
@@ -201,10 +217,12 @@ export default function ChatHeader({
             <span className="hidden text-xs font-bold uppercase tracking-wider lg:inline">
               Paramètres
             </span>
-          </button>
+          </motion.button>
           <div className="relative" ref={dropdownRef}>
-            <button
+            <motion.button
               onClick={() => setShowDropdown(!showDropdown)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               className="flex items-center gap-2 rounded-2xl border border-transparent p-2.5 text-[var(--text-secondary)] transition-all hover:border-[var(--card-border)] hover:bg-[var(--card-bg)] hover:text-blue-400"
               title="Actions supplémentaires"
               aria-label="Actions supplémentaires"
@@ -212,7 +230,7 @@ export default function ChatHeader({
               aria-haspopup="true"
             >
               <MoreVertical size={18} />
-            </button>
+            </motion.button>
             {showDropdown && (
               <div
                 className="absolute right-0 top-full z-50 mt-2 w-48 rounded-2xl border border-[var(--card-border)] bg-[var(--background)] p-2 shadow-2xl"
@@ -275,14 +293,22 @@ export default function ChatHeader({
               </div>
             )}
           </div>
-          <button
+          <motion.button
             onClick={() => void onCreateConversation()}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
             className="rounded-2xl border border-transparent p-2.5 text-[var(--text-secondary)] transition-all hover:border-[var(--card-border)] hover:bg-[var(--card-bg)] hover:text-emerald-500 dark:hover:text-emerald-400"
             title="Nouvelle discussion"
             aria-label="Créer une nouvelle discussion"
           >
-            <Plus size={18} />
-          </button>
+            <motion.span
+              whileHover={{ rotate: 90 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="inline-flex"
+            >
+              <Plus size={18} />
+            </motion.span>
+          </motion.button>
         </div>
       </div>
 
