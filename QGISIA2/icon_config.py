@@ -44,7 +44,7 @@ MENU_CONFIG = {
         {
             "name": "Ouvrir",
             "tooltip": "Ouvrir le panneau QGISAI+ AI",
-            "icon": "icon.png",
+            "icon": "icon.svg",
             "shortcut": "Ctrl+Shift+G",
         },
         {
@@ -102,7 +102,7 @@ MESSAGE_CONFIG = {
 
 # Configuration des couleurs pour l'interface QGIS
 COLORS = {
-    "primary": "#0891b2",  # cyan-600
+    "primary": "#22c55e",  # emerald-500
     "success": "#10b981",  # emerald-500
     "warning": "#f59e0b",  # amber-500
     "error": "#ef4444",    # red-500

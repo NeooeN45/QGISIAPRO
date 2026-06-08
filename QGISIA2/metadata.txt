@@ -11,5 +11,5 @@ license=MIT
 repository=https://github.com/NeooeN45/QGISIA2
 category=Plugins
 tags=ai, assistant, qgis, qgis4, pyqgis, geospatial, cadastre, raster, openrouter, gemini, ollama
-icon=logo.png
+icon=icon.svg
 experimental=False

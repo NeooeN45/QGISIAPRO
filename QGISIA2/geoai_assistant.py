@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from .ui import LaunchButton, QGISAILaunchDock
+import ast
 import functools
 import http.server
 import importlib
 import json
 import os
+import re
 import socketserver
 import statistics
 import sys
@@ -13,6 +15,42 @@ import threading
 import traceback
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
+
+# ── Sécurité (P0) ───────────────────────────────────────────────────────────
+# Middleware de rate-limiting / validation, désormais réellement câblé au bridge.
+try:
+    from .security_layer import SecurityMiddleware
+except Exception:  # pragma: no cover - fallback standalone / import partiel
+    SecurityMiddleware = None  # type: ignore[assignment]
+
+# Validation de sécurité des scripts PyQGIS (module pur, testable sans QGIS).
+try:
+    from . import script_validation
+except ImportError:  # pragma: no cover - fallback import absolu (standalone)
+    import script_validation  # type: ignore[no-redef]
+
+# Taille max d'un body de requête bridge. 32 Mo autorise les images base64
+# (vision) tout en bloquant les payloads de saturation mémoire (DoS).
+MAX_REQUEST_BYTES = 32 * 1024 * 1024
+
+# Le bridge n'écoute que sur 127.0.0.1 : seules les origines locales sont
+# autorisées (défense anti DNS-rebinding / CSRF local). Remplace `*`.
+_ALLOWED_ORIGIN_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", re.I)
+
+
+def _send_cors_headers(handler):
+    """Écrit des en-têtes CORS restreints aux origines locales.
+
+    L'UI servie depuis http://127.0.0.1:<port> (same-origin) reste autorisée ;
+    toute origine distante est refusée. Remplace l'ancien
+    `Access-Control-Allow-Origin: *` qui exposait les endpoints sensibles.
+    """
+    origin = handler.headers.get("Origin", "")
+    if origin and _ALLOWED_ORIGIN_RE.match(origin):
+        handler.send_header("Access-Control-Allow-Origin", origin)
+        handler.send_header("Vary", "Origin")
+    handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
 
 # Correction des problèmes de versions multiples QGIS
 try:
@@ -3345,94 +3383,21 @@ class ScriptWorker(QObject):
     """
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
-    
-    # Patterns dangereux qui font crasher QGIS
-    DANGEROUS_PATTERNS = [
-        r'\bexit\s*\(\s*\)',           # exit()
-        r'\bquit\s*\(\s*\)',           # quit()
-        r'\bsys\.exit\s*\(',           # sys.exit()
-        r'\bos\._exit\s*\(',           # os._exit()
-        r'\b__import__\s*\(',          # __import__() dynamique
-        r'\beval\s*\(',                 # eval()
-        r'\bexec\s*\(',                 # exec() imbriqué
-        r'\bsubprocess\.',            # subprocess
-        r'\bos\.system\s*\(',          # os.system()
-        r'\bos\.popen\s*\(',           # os.popen()
-    ]
-    
+
     def __init__(self, script, context, timeout_seconds=30):
         super().__init__()
         self.script = script
         self.context = context
         self.timeout_seconds = timeout_seconds
         self._is_running = False
-        
-    @classmethod
-    def validate_script(cls, script):
-        """
-        Valide le script avant exécution. Retourne (is_valid, error_message).
-        """
-        import re
-        
-        # Vérifier les patterns dangereux
-        for pattern in cls.DANGEROUS_PATTERNS:
-            if re.search(pattern, script, re.IGNORECASE):
-                match = re.search(pattern, script, re.IGNORECASE)
-                dangerous_code = match.group(0) if match else pattern
-                return False, f"Code dangereux détecté et bloqué: '{dangerous_code}'\nCe pattern peut crasher QGIS."
-        
-        # Vérifier les appels à des fonctions non définies dans le contexte standard
-        undefined_functions = cls._detect_undefined_functions(script)
-        if undefined_functions:
-            return False, f"Fonctions inexistantes détectées: {', '.join(undefined_functions)}\nCes fonctions ne sont pas disponibles dans PyQGIS."
-        
-        return True, None
-    
-    @classmethod
-    def _detect_undefined_functions(cls, script):
-        """Détecte les appels à des fonctions qui n'existent pas dans le contexte PyQGIS"""
-        import re
-        import ast
-        
-        undefined = []
-        
-        # Fonctions interdites/inexistantes fréquemment hallucinées par les LLM
-        hallucinated_functions = [
-            'searchGeoApiCommunes',
-            'searchCadastreParcels', 
-            'applyParcelStylePreset',
-            'setLayerLabels',
-            'addServiceLayer',
-            # Ajouter d'autres fonctions hallucinées connues ici
-        ]
-        
-        try:
-            tree = ast.parse(script)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        func_name = node.func.id
-                        if func_name in hallucinated_functions:
-                            undefined.append(func_name)
-                    elif isinstance(node.func, ast.Attribute):
-                        # Méthodes sur objets
-                        full_name = cls._get_attribute_chain(node.func)
-                        if full_name in hallucinated_functions:
-                            undefined.append(full_name)
-        except SyntaxError:
-            # Erreur de syntaxe - sera gérée lors de l'exécution
-            pass
-        
-        return list(set(undefined))
-    
+
     @staticmethod
-    def _get_attribute_chain(node):
-        """Extrait la chaîne complète d'un attribut (ex: obj.method.submethod)"""
-        if isinstance(node, ast.Name):
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            return ScriptWorker._get_attribute_chain(node.value) + "." + node.attr
-        return ""
+    def validate_script(script):
+        """Valide le script avant exécution. Retourne (is_valid, error_message).
+
+        Délègue au module pur `script_validation` (testable en CI sans QGIS).
+        """
+        return script_validation.validate_script(script)
     
     def run(self):
         """Exécute le script avec protection timeout dans un thread séparé"""
@@ -3580,6 +3545,23 @@ class ThreadedAssetServer:
         self.httpd = None
         self.thread = None
         self.port = None
+        # Rate-limiter anti boucle d'agent runaway / abus local. Limite haute
+        # pour ne pas pénaliser le tool-calling légitime (nombreux appels rapides).
+        self.security = (
+            SecurityMiddleware(max_requests=1200, window_seconds=60.0)
+            if SecurityMiddleware is not None else None
+        )
+
+    def _enforce_rate_limit(self, handler):
+        """Renvoie True si la requête est autorisée, sinon répond 429 et False."""
+        if self.security is None:
+            return True
+        client = handler.client_address[0] if handler.client_address else "local"
+        allowed, err = self.security.check_rate(client)
+        if not allowed:
+            self._send_json(handler, 429, {"ok": False, "error": err})
+            return False
+        return True
 
     def _send_json(self, handler, status_code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -3587,15 +3569,27 @@ class ThreadedAssetServer:
         handler.send_header("Content-Type", "application/json; charset=utf-8")
         handler.send_header("Content-Length", str(len(body)))
         handler.send_header("Cache-Control", "no-store")
-        handler.send_header("Access-Control-Allow-Origin", "*")
-        handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+        _send_cors_headers(handler)
         handler.end_headers()
         handler.wfile.write(body)
 
     def _read_json_body(self, handler):
-        length = int(handler.headers.get("Content-Length", "0"))
+        try:
+            length = int(handler.headers.get("Content-Length", "0"))
+        except (TypeError, ValueError):
+            return {}
         if length <= 0:
+            return {}
+        # Borne anti-DoS : refuse les payloads démesurés sans les charger en RAM.
+        if length > MAX_REQUEST_BYTES:
+            try:
+                QgsMessageLog.logMessage(
+                    f"Requête bridge rejetée: body {length} octets > max {MAX_REQUEST_BYTES}",
+                    "QGISAI+",
+                    level=Qgis.Warning,
+                )
+            except Exception:
+                pass
             return {}
 
         raw_body = handler.rfile.read(length)
@@ -4664,7 +4658,7 @@ class ThreadedAssetServer:
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
         handler.send_header("Cache-Control", "no-cache")
-        handler.send_header("Access-Control-Allow-Origin", "*")
+        _send_cors_headers(handler)
         handler.send_header("X-Accel-Buffering", "no")
         handler.end_headers()
 
@@ -4705,14 +4699,15 @@ class ThreadedAssetServer:
 
             def do_OPTIONS(self):
                 self.send_response(200)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                _send_cors_headers(self)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
 
             def do_GET(self):
                 parsed = urlparse(self.path)
+                if parsed.path.startswith("/api/"):
+                    if not server_instance._enforce_rate_limit(self):
+                        return
                 if parsed.path.startswith("/api/qgis/"):
                     if server_instance._handle_api_request(self, "GET"):
                         return
@@ -4725,6 +4720,9 @@ class ThreadedAssetServer:
 
             def do_POST(self):
                 parsed = urlparse(self.path)
+                if parsed.path.startswith("/api/"):
+                    if not server_instance._enforce_rate_limit(self):
+                        return
                 if parsed.path.startswith("/api/llm/"):
                     if server_instance._handle_llm_request(self, "POST"):
                         return
@@ -4934,7 +4932,7 @@ class GeoAIAssistant:
 
         icon_label = QLabel()
         icon_label.setFixedSize(164, 58)
-        icon_label.setPixmap(QIcon(os.path.join(self.plugin_dir, "logo.png")).pixmap(164, 58))
+        icon_label.setPixmap(QIcon(os.path.join(self.plugin_dir, "icon.svg")).pixmap(164, 58))
         hero_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
 
         hero_text_layout = QVBoxLayout()
@@ -5039,7 +5037,7 @@ class GeoAIAssistant:
         self._debug("create_dock:dock_created")
         self.dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.dock.setMinimumWidth(420)
-        self.dock.setWindowIcon(QIcon(os.path.join(self.plugin_dir, "icon.png")))
+        self.dock.setWindowIcon(QIcon(os.path.join(self.plugin_dir, "icon.svg")))
 
         container = QWidget()
         self._debug("create_dock:container_created")
@@ -5101,7 +5099,7 @@ class GeoAIAssistant:
 
     def initGui(self):
         self._debug("initGui:start")
-        icon_path = os.path.join(self.plugin_dir, "logo.png")
+        icon_path = os.path.join(self.plugin_dir, "icon.svg")
 
         # Action principale avec configuration
         action_name = ICON_CONFIG.get("name", "QGISAI+")
@@ -5165,7 +5163,7 @@ class GeoAIAssistant:
                         continue
                     elif item_name == "Paramètres...":
                         self.settings_action = QAction(item_name, self.iface.mainWindow())
-                        if item_icon and item_icon != "icon.png":
+                        if item_icon and item_icon != "icon.svg":
                             self.settings_action.setIcon(QIcon.fromTheme(item_icon))
                         self.settings_action.setToolTip(item_tooltip)
                         self.settings_action.triggered.connect(self._open_settings)
