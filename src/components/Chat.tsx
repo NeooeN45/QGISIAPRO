@@ -555,22 +555,22 @@ export default function Chat(props: ChatProps) {
         {/* Bouton toggle sidebar — pill sobre sur le bord gauche de la zone chat */}
         <motion.button
           onClick={toggleSidebar}
-          className="absolute left-0 top-1/2 z-40 -translate-y-1/2 -translate-x-1/2 flex h-12 w-[18px] items-center justify-center rounded-full border border-white/[0.10] bg-[#17181b]/90 shadow-2xl backdrop-blur-md hover:border-white/20 hover:bg-[#1e2023]/90 transition-colors duration-200"
+          className="absolute left-0 top-1/2 z-40 -translate-y-1/2 -translate-x-1/2 flex h-16 w-[22px] items-center justify-center rounded-full border border-white/[0.12] bg-[#17181b]/90 shadow-2xl backdrop-blur-md hover:border-white/25 hover:bg-[#1e2023]/90 transition-colors duration-200"
           whileTap={{ scale: 0.93 }}
           aria-label={sidebarOpen ? "Fermer le panneau" : "Ouvrir le panneau"}
         >
           <motion.svg
-            width="7"
-            height="12"
-            viewBox="0 0 7 12"
+            width="8"
+            height="14"
+            viewBox="0 0 8 14"
             fill="none"
             animate={{ rotate: sidebarOpen ? 0 : 180 }}
             transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           >
             <path
-              d="M5 1L2 6L5 11"
-              stroke="rgba(255,255,255,0.40)"
-              strokeWidth="1.5"
+              d="M6 1L2 7L6 13"
+              stroke="rgba(255,255,255,0.55)"
+              strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -596,10 +596,6 @@ export default function Chat(props: ChatProps) {
           onScroll={handleScroll}
           className="relative flex-1 overflow-y-auto px-4 pb-60 pt-4 md:px-6 chat-scrollbar"
         >
-          {/* Fade gradient top */}
-          <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-8 bg-gradient-to-b from-[var(--background)] to-transparent" />
-          {/* Fade gradient bottom */}
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-8 bg-gradient-to-t from-[var(--background)] to-transparent" />
 
           <div className="mx-auto w-full max-w-4xl">
             {messages.length <= 1 && !isLoading ? (
