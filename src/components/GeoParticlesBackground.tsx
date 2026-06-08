@@ -1,136 +1,212 @@
 /**
- * WaveBackground — Fond de vagues SVG animées, discrètes et élégantes.
+ * NebulaBackground — Fond nébuleuse inspiré de Gemini "stitch_nebula".
  *
- * Remplace GeoParticlesBackground (canvas 2D avec nœuds volants).
- * 3 couches de vagues sinusoïdales en teintes bleues/violet, avec
- * animation CSS pure — aucune dépendance, 0 canvas, très léger.
+ * Canvas 2D. Des orbes de lumière diffuse (bleu / indigo / violet / cyan)
+ * flottent lentement, se fondent les uns dans les autres, créant un effet
+ * de nébuleuse cosmique qui "respire". Discret, élégant, jamais distrayant.
  *
  * Props :
- *   isDark — true = dark mode, false = light mode (opacités adaptées)
+ *   isDark — true = dark mode (opacités vives), false = light (très atténué)
  */
 
-interface WaveBackgroundProps {
+import { useEffect, useRef, useCallback } from "react";
+
+/* ─── Types ──────────────────────────────────────────────────────────── */
+
+interface Orb {
+  x: number;
+  y: number;
+  /** Position cible vers laquelle l'orbe dérive */
+  tx: number;
+  ty: number;
+  radius: number;
+  /** Couleur HSL — teinte dans la gamme bleu→violet */
+  hue: number;
+  /** Saturation */
+  sat: number;
+  /** Phase de pulsation [0, 2π] */
+  pulsePhase: number;
+  pulseSpeed: number;
+  /** Vitesse de déplacement (px/frame) */
+  speed: number;
+  /** Opacité de base [0, 1] */
+  alpha: number;
+}
+
+/* ─── Config ──────────────────────────────────────────────────────────── */
+
+const ORB_COUNT      = 7;   // Nombre d'orbes simultanés
+const MIN_RADIUS     = 180; // px — rayon du gradient radial
+const MAX_RADIUS     = 420;
+const MAX_ALPHA_DARK  = 0.22; // opacité max en dark mode
+const MAX_ALPHA_LIGHT = 0.09; // opacité max en light mode — très discret
+const DRIFT_SPEED_MIN = 0.15; // px/frame
+const DRIFT_SPEED_MAX = 0.45;
+const PULSE_MIN       = 0.008;
+const PULSE_MAX       = 0.018;
+
+/* ─── Palette : teintes bleues/indigo/violet/cyan ─────────────────────── */
+//   220 = bleu roi · 240 = indigo · 260 = violet · 200 = cyan-bleu
+const HUE_RANGE: [number, number] = [195, 275];
+
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+
+function rand(min: number, max: number): number {
+  return Math.random() * (max - min) + min;
+}
+
+function makeOrb(width: number, height: number): Orb {
+  const x = rand(0, width);
+  const y = rand(0, height);
+  return {
+    x,
+    y,
+    tx: rand(0, width),
+    ty: rand(0, height),
+    radius:     rand(MIN_RADIUS, MAX_RADIUS),
+    hue:        rand(...HUE_RANGE),
+    sat:        rand(70, 100),
+    pulsePhase: rand(0, Math.PI * 2),
+    pulseSpeed: rand(PULSE_MIN, PULSE_MAX),
+    speed:      rand(DRIFT_SPEED_MIN, DRIFT_SPEED_MAX),
+    alpha:      rand(0.4, 1.0),
+  };
+}
+
+/* ─── Composant ───────────────────────────────────────────────────────── */
+
+interface NebulaBackgroundProps {
   isDark: boolean;
 }
 
-export default function GeoParticlesBackground({ isDark }: WaveBackgroundProps) {
+export default function GeoParticlesBackground({ isDark }: NebulaBackgroundProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const stateRef = useRef<{
+    orbs:    Orb[];
+    animId:  number;
+    width:   number;
+    height:  number;
+  }>({ orbs: [], animId: 0, width: 0, height: 0 });
+
+  /* ── Rendu d'une frame ─────────────────────────────────────────────── */
+  const drawFrame = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      const { orbs, width, height } = stateRef.current;
+      const maxAlpha = isDark ? MAX_ALPHA_DARK : MAX_ALPHA_LIGHT;
+
+      // Efface avec un fondu très léger pour un effet de traîne douce
+      ctx.fillStyle = isDark
+        ? "rgba(12, 13, 16, 0.06)"
+        : "rgba(240, 244, 248, 0.06)";
+      ctx.fillRect(0, 0, width, height);
+
+      for (const orb of orbs) {
+        // ── Mise à jour de la position (dérive vers la cible) ──────────
+        const dx = orb.tx - orb.x;
+        const dy = orb.ty - orb.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 2) {
+          // Nouvelle cible aléatoire quand l'orbe arrive
+          orb.tx = rand(orb.radius * 0.3, width  - orb.radius * 0.3);
+          orb.ty = rand(orb.radius * 0.3, height - orb.radius * 0.3);
+        } else {
+          orb.x += (dx / dist) * orb.speed;
+          orb.y += (dy / dist) * orb.speed;
+        }
+
+        // ── Pulsation de l'opacité ─────────────────────────────────────
+        orb.pulsePhase = (orb.pulsePhase + orb.pulseSpeed) % (Math.PI * 2);
+        const pulse = 0.5 + 0.5 * Math.sin(orb.pulsePhase);
+        const alpha = orb.alpha * pulse * maxAlpha;
+
+        // ── Dessin : gradient radial (orbe diffus) ─────────────────────
+        const gradient = ctx.createRadialGradient(
+          orb.x, orb.y, 0,
+          orb.x, orb.y, orb.radius,
+        );
+
+        // Centre lumineux
+        gradient.addColorStop(
+          0,
+          `hsla(${orb.hue}, ${orb.sat}%, 70%, ${alpha})`,
+        );
+        // Milieu — teinte légèrement décalée pour un effet nébuleuse
+        gradient.addColorStop(
+          0.4,
+          `hsla(${orb.hue + 15}, ${orb.sat - 10}%, 55%, ${alpha * 0.55})`,
+        );
+        // Bord — fondu total
+        gradient.addColorStop(1, `hsla(${orb.hue}, ${orb.sat}%, 50%, 0)`);
+
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+    },
+    [isDark],
+  );
+
+  /* ── Boucle d'animation ────────────────────────────────────────────── */
+  const animate = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    drawFrame(ctx);
+    stateRef.current.animId = requestAnimationFrame(animate);
+  }, [drawFrame]);
+
+  /* ── Setup et resize ───────────────────────────────────────────────── */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    function init() {
+      if (!canvas) return;
+      const w = canvas.offsetWidth  || window.innerWidth;
+      const h = canvas.offsetHeight || window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      canvas.width  = w * dpr;
+      canvas.height = h * dpr;
+
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.scale(dpr, dpr);
+
+      stateRef.current.width  = w;
+      stateRef.current.height = h;
+
+      // Initialiser les orbes avec des positions éparpillées
+      stateRef.current.orbs = Array.from({ length: ORB_COUNT }, () => makeOrb(w, h));
+    }
+
+    init();
+
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(stateRef.current.animId);
+      init();
+      stateRef.current.animId = requestAnimationFrame(animate);
+    });
+    observer.observe(canvas);
+
+    stateRef.current.animId = requestAnimationFrame(animate);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(stateRef.current.animId);
+    };
+  }, [animate]);
+
   return (
-    <div
+    <canvas
+      ref={canvasRef}
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-    >
-      <svg
-        className="absolute inset-0 h-full w-full"
-        preserveAspectRatio="xMidYMid slice"
-        viewBox="0 0 1440 900"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          {/* Vague 1 — grande, lente, bleue profonde */}
-          <path id="wave1" d="M0,400 C180,340 360,460 540,400 C720,340 900,460 1080,400 C1260,340 1380,420 1440,400 L1440,900 L0,900 Z" />
-          {/* Vague 2 — moyenne, violette */}
-          <path id="wave2" d="M0,520 C200,460 400,580 600,520 C800,460 1000,580 1200,520 C1350,470 1420,530 1440,520 L1440,900 L0,900 Z" />
-          {/* Vague 3 — petite, cyan, avant-plan */}
-          <path id="wave3" d="M0,640 C240,590 480,680 720,640 C960,590 1200,680 1440,640 L1440,900 L0,900 Z" />
-
-          {/* Gradient vague 1 */}
-          <linearGradient id="wg1" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor={isDark ? "#1e3a8a" : "#dbeafe"} stopOpacity={isDark ? "0.28" : "0.35"} />
-            <stop offset="50%"  stopColor={isDark ? "#3730a3" : "#c7d2fe"} stopOpacity={isDark ? "0.22" : "0.28"} />
-            <stop offset="100%" stopColor={isDark ? "#1e3a8a" : "#dbeafe"} stopOpacity={isDark ? "0.28" : "0.35"} />
-          </linearGradient>
-
-          {/* Gradient vague 2 */}
-          <linearGradient id="wg2" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor={isDark ? "#4c1d95" : "#ede9fe"} stopOpacity={isDark ? "0.18" : "0.25"} />
-            <stop offset="50%"  stopColor={isDark ? "#5b21b6" : "#ddd6fe"} stopOpacity={isDark ? "0.14" : "0.20"} />
-            <stop offset="100%" stopColor={isDark ? "#4c1d95" : "#ede9fe"} stopOpacity={isDark ? "0.18" : "0.25"} />
-          </linearGradient>
-
-          {/* Gradient vague 3 */}
-          <linearGradient id="wg3" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor={isDark ? "#164e63" : "#cffafe"} stopOpacity={isDark ? "0.12" : "0.18"} />
-            <stop offset="50%"  stopColor={isDark ? "#0e7490" : "#a5f3fc"} stopOpacity={isDark ? "0.10" : "0.15"} />
-            <stop offset="100%" stopColor={isDark ? "#164e63" : "#cffafe"} stopOpacity={isDark ? "0.12" : "0.18"} />
-          </linearGradient>
-        </defs>
-
-        {/* Fond dégradé très subtil */}
-        <rect
-          width="1440"
-          height="900"
-          fill={isDark
-            ? "url(#bgGradDark)"
-            : "url(#bgGradLight)"}
-        />
-        <defs>
-          <linearGradient id="bgGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#0f172a" stopOpacity="0" />
-            <stop offset="60%"  stopColor="#1e1b4b" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="bgGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#eff6ff" stopOpacity="0" />
-            <stop offset="60%"  stopColor="#eef2ff" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#f0fdfa" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* ── Vague 1 ── grande et lente */}
-        <g className="wave-group-1">
-          <use
-            href="#wave1"
-            fill="url(#wg1)"
-            style={{ animation: "wave-drift-1 18s ease-in-out infinite alternate" }}
-          />
-        </g>
-
-        {/* ── Vague 2 ── moyenne, décalée */}
-        <g className="wave-group-2">
-          <use
-            href="#wave2"
-            fill="url(#wg2)"
-            style={{ animation: "wave-drift-2 24s ease-in-out infinite alternate" }}
-          />
-        </g>
-
-        {/* ── Vague 3 ── fine, au premier plan */}
-        <g className="wave-group-3">
-          <use
-            href="#wave3"
-            fill="url(#wg3)"
-            style={{ animation: "wave-drift-3 14s ease-in-out infinite alternate" }}
-          />
-        </g>
-      </svg>
-
-      <style>{`
-        @keyframes wave-drift-1 {
-          0%   { transform: translateX(0px) translateY(0px) scaleY(1); }
-          33%  { transform: translateX(-28px) translateY(12px) scaleY(1.04); }
-          66%  { transform: translateX(18px) translateY(-8px) scaleY(0.97); }
-          100% { transform: translateX(-12px) translateY(6px) scaleY(1.02); }
-        }
-        @keyframes wave-drift-2 {
-          0%   { transform: translateX(0px) translateY(0px) scaleY(1); }
-          33%  { transform: translateX(22px) translateY(-14px) scaleY(1.03); }
-          66%  { transform: translateX(-30px) translateY(10px) scaleY(0.98); }
-          100% { transform: translateX(16px) translateY(-6px) scaleY(1.01); }
-        }
-        @keyframes wave-drift-3 {
-          0%   { transform: translateX(0px) translateY(0px); }
-          50%  { transform: translateX(35px) translateY(-10px); }
-          100% { transform: translateX(-20px) translateY(8px); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .wave-group-1, .wave-group-2, .wave-group-3 {
-            animation: none !important;
-          }
-          .wave-group-1 use, .wave-group-2 use, .wave-group-3 use {
-            animation: none !important;
-          }
-        }
-      `}</style>
-    </div>
+      className="pointer-events-none fixed inset-0 z-0 h-full w-full"
+      style={{ mixBlendMode: isDark ? "screen" : "multiply" }}
+    />
   );
 }
