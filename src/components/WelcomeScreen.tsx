@@ -335,13 +335,13 @@ function ConnectionBadge({ hasLayers }: { hasLayers: boolean }) {
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 0.5, duration: 0.4 }}
-      className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-1"
+      className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-1.5"
     >
       <span className="relative flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
       </span>
-      <span className="text-[11px] font-medium tracking-wide text-emerald-400">
+      <span className="text-[13px] font-medium tracking-wide text-emerald-400">
         {label}
       </span>
     </motion.div>
@@ -517,7 +517,7 @@ export default function WelcomeScreen({
             >
               QGIS AI+
             </h1>
-            <p className="mt-0.5 text-[13px] font-medium tracking-[0.15em] text-gray-500 dark:text-white/30">
+            <p className="mt-3 text-[18px] font-semibold tracking-wide text-white/72">
               Votre co-pilote géospatial intelligent
             </p>
           </div>
