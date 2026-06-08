@@ -1828,54 +1828,24 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
 
   return (
     <motion.div
-      className="relative flex h-full shrink-0 flex-col border-r border-gray-200 dark:border-white/[0.05] sidebar-bg backdrop-blur-2xl shadow-[2px_0_32px_rgba(0,0,0,0.18)] overflow-visible"
-      animate={{ width: isOpen ? "22rem" : "4rem" }}
+      className="relative flex h-full shrink-0 flex-col border-r border-gray-200 dark:border-white/[0.05] sidebar-bg backdrop-blur-2xl shadow-[2px_0_32px_rgba(0,0,0,0.18)] overflow-hidden"
+      animate={{ width: isOpen ? "22rem" : "0rem" }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
       style={{ minWidth: 0 }}
     >
-      {/* Bouton toggle flottant en bordure droite */}
-      <motion.button
-        onClick={onToggleOpen}
-        className="absolute right-0 top-1/2 z-50 flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-white/[0.08] bg-[#1a1a1b] shadow-lg shadow-black/40"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        aria-label={isOpen ? "Fermer la sidebar" : "Ouvrir la sidebar"}
-      >
-        <motion.svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          animate={{ rotate: isOpen ? 0 : 180 }}
-          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <path
-            d="M6.5 2L3.5 5L6.5 8"
-            stroke="rgba(255,255,255,0.6)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </motion.svg>
-      </motion.button>
+
       <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/[0.05] bg-gradient-to-r from-transparent via-transparent to-transparent px-4 py-4">
-        {isOpen ? (
-          <div>
+        <div>
             <p className="text-[9px] font-black uppercase tracking-[0.35em] bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
               QGISAI+
             </p>
-            <h2 className="mt-0.5 text-[13px] font-bold text-gray-800 dark:text-gray-100">
+            <h2 className="mt-0.5 text-[13px] font-bold text-gray-100">
               Workspace QGIS
             </h2>
           </div>
-        ) : (
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/15 border border-emerald-500/25">
-            <Sparkles size={16} className="text-emerald-400" />
-          </div>
-        )}
       </div>
 
-      <div className={cn("flex gap-1.5 px-3 py-2.5", !isOpen && "flex-col px-2 gap-2")}>
+      <div className={"flex gap-1.5 px-3 py-2.5"}>
         {[
           { id: "history" as SidebarTab, label: "Historique", Icon: MessageSquare, badge: conversations.length,
             accent: "blue" },
@@ -1891,14 +1861,14 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
             onClick={() => setActiveTab(id)}
             className={cn(
               "relative flex items-center gap-2 rounded-2xl border px-3 py-2 text-[12px] font-semibold transition-all duration-200",
-              isOpen ? "flex-1" : "w-full justify-center py-3",
+              "flex-1",
               activeTab === id
                 ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300 shadow-sm"
                 : "border-gray-200 dark:border-white/[0.06] bg-gray-100/60 dark:bg-white/[0.03] text-gray-500 dark:text-white/35 hover:bg-gray-100 dark:hover:bg-white/[0.06] hover:text-gray-700 dark:hover:text-white/60",
             )}
             title={label}
           >
-            <Icon size={isOpen ? 14 : 20} />
+            <Icon size={14} />
             <AnimatePresence initial={false}>
               {isOpen && (
                 <motion.span
@@ -1934,17 +1904,17 @@ export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
         ))}
       </div>
 
-      <div className={cn("px-3 pb-2", !isOpen && "px-2")}>
+      <div className={"px-3 pb-2"}>
         {activeTab === "history" ? (
           <button
             onClick={() => void onCreateConversation()}
             className={cn(
               "group relative flex items-center justify-center rounded-2xl border transition-all duration-200 overflow-hidden",
               "border-blue-500/35 bg-gradient-to-r from-blue-600/15 to-blue-500/10 text-blue-600 dark:text-blue-300 hover:from-blue-600/25 hover:to-blue-500/18 hover:shadow-lg hover:shadow-blue-500/20",
-              !isOpen ? "h-12 w-full" : "w-full gap-2 px-4 py-2.5 text-[13px] font-bold",
+              "w-full gap-2 px-4 py-2.5 text-[13px] font-bold",
             )}
           >
-            <Plus size={isOpen ? 15 : 20} />
+            <Plus size={15} />
             {isOpen && "Nouvelle discussion"}
           </button>
         ) : activeTab === "layers" ? (

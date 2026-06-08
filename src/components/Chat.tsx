@@ -553,6 +553,30 @@ export default function Chat(props: ChatProps) {
       </Suspense>
 
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Bouton toggle sidebar — pill sobre sur le bord gauche de la zone chat */}
+        <motion.button
+          onClick={toggleSidebar}
+          className="absolute left-0 top-1/2 z-40 -translate-y-1/2 -translate-x-1/2 flex h-12 w-[18px] items-center justify-center rounded-full border border-white/[0.10] bg-[#17181b]/90 shadow-2xl backdrop-blur-md hover:border-white/20 hover:bg-[#1e2023]/90 transition-colors duration-200"
+          whileTap={{ scale: 0.93 }}
+          aria-label={sidebarOpen ? "Fermer le panneau" : "Ouvrir le panneau"}
+        >
+          <motion.svg
+            width="7"
+            height="12"
+            viewBox="0 0 7 12"
+            fill="none"
+            animate={{ rotate: sidebarOpen ? 0 : 180 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <path
+              d="M5 1L2 6L5 11"
+              stroke="rgba(255,255,255,0.40)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </motion.svg>
+        </motion.button>
         {/* Ambient glow effects around the chat zone */}
         <div className="pointer-events-none absolute -left-20 top-1/4 h-96 w-96 rounded-full bg-blue-500/[0.04] blur-3xl" />
         <div className="pointer-events-none absolute -right-20 top-1/2 h-80 w-80 rounded-full bg-emerald-500/[0.04] blur-3xl" />
