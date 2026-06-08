@@ -55,6 +55,7 @@ import { appendDebugEvent } from "../lib/debug-log";
 import { useUIStore } from "../stores/useUIStore";
 import { useSmartSuggestionsStore } from "../stores/useSmartSuggestionsStore";
 import { useStreamingStore } from "../stores/useStreamingStore";
+import { useSettingsStore } from "../stores/useSettingsStore";
 
 interface ChatProps {
   activeConversation: ChatConversation | null;
@@ -470,11 +471,13 @@ export default function Chat(props: ChatProps) {
     void onRefreshLayers();
   };
 
+  const isDark = useSettingsStore((s) => s.settings.theme) !== "light";
+
   return (
     <div className="flex h-full w-full overflow-clip bg-gray-50 dark:bg-[#131314] text-gray-800 dark:text-white">
       <div className="bg-mesh" />
       <Suspense fallback={null}>
-        <GeoParticlesBackground isDark={true} />
+        <GeoParticlesBackground isDark={isDark} />
       </Suspense>
       <Suspense fallback={
         <div className="flex h-[84px] w-[396px] items-center justify-center border-r border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">

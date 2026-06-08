@@ -1,15 +1,15 @@
 /**
- * GeoParticlesBackground — Fond de particules géospatiales animées.
+ * GeoParticlesBackground — Fond vidéo nébuleuse (dark) ou particules canvas (light).
  *
- * Canvas 2D, sans dépendance externe.
- * Représente un réseau de nœuds SIG (satellite, vecteur, raster) connectés
- * par des arêtes dynamiques, avec coordonnées flottantes et anneaux de scan.
+ * Dark mode  : vidéo nebula-bg.mp4 en fond, loop muted autoplay, légèrement assombrie.
+ * Light mode : fond canvas particules géospatiales (comportement original inchangé).
  *
  * Props :
- *   isDark — si true, palette sombre ; si false, palette claire atténuée.
+ *   isDark — si true, palette sombre avec vidéo ; si false, canvas particules clair.
  */
 
 import { useEffect, useRef, useCallback } from "react";
+import nebulaBg from "../assets/nebula-bg.mp4";
 
 /* ─── Types internes ─────────────────────────────────────────── */
 
@@ -22,7 +22,6 @@ interface GeoNode {
   vy: number;
   radius: number;
   kind: NodeKind;
-  /** Phase du clignotement [0, 2π] */
   blinkPhase: number;
   blinkSpeed: number;
   opacity: number;
@@ -35,7 +34,6 @@ interface FloatingCoord {
   lat: number;
   lon: number;
   age: number;
-  /** Durée de vie totale en frames */
   lifetime: number;
   opacity: number;
   fontSize: number;
@@ -65,9 +63,9 @@ interface ParticleConfig {
 /* ─── Palettes ───────────────────────────────────────────────── */
 
 const DARK_PALETTE: Record<NodeKind, string> = {
-  satellite: "#60a5fa", // bleu
-  vector:    "#34d399", // émeraude
-  raster:    "#a78bfa", // violet
+  satellite: "#60a5fa",
+  vector:    "#34d399",
+  raster:    "#a78bfa",
 };
 
 const LIGHT_PALETTE: Record<NodeKind, string> = {
@@ -103,8 +101,7 @@ const LIGHT_CONFIG: ParticleConfig = {
   coordSpawnInterval:  110,
 };
 
-/* ─── Constantes ─────────────────────────────────────────────── */
-const NODE_KINDS: NodeKind[]     = ["satellite", "vector", "raster"];
+const NODE_KINDS: NodeKind[]       = ["satellite", "vector", "raster"];
 const NODE_RADII: [number, number] = [2, 5];
 const VELOCITY_MAX                 = 0.35;
 const MIN_EDGE_OPACITY             = 0.02;
@@ -173,249 +170,198 @@ interface GeoParticlesBackgroundProps {
   isDark: boolean;
 }
 
-export default function GeoParticlesBackground({ isDark }: GeoParticlesBackgroundProps) {
+/* ── Fond vidéo nébuleuse (dark mode) ───────────────────────── */
+function NebulaVideoBackground() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+    >
+      <video
+        src={nebulaBg}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ opacity: 0.55 }}
+      />
+      {/* Voile sombre pour ne pas écraser le contenu */}
+      <div className="absolute inset-0 bg-[#0c0d0f]/55" />
+    </div>
+  );
+}
+
+/* ── Fond canvas particules (light mode) ────────────────────── */
+function ParticlesBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  /* Toutes les données d'état mutable du canvas dans un ref unique
-     pour éviter les re-renders React */
   const stateRef = useRef({
-    nodes:       [] as GeoNode[],
-    coords:      [] as FloatingCoord[],
-    rings:        [] as ScanRing[],
-    frameCount:   0,
-    animId:       0,
-    lastTime:     0,
-    width:        0,
-    height:       0,
+    nodes:      [] as GeoNode[],
+    coords:     [] as FloatingCoord[],
+    rings:      [] as ScanRing[],
+    frameCount: 0,
+    animId:     0,
+    width:      0,
+    height:     0,
   });
 
-  const drawFrame = useCallback(
-    (ctx: CanvasRenderingContext2D, config: ParticleConfig, palette: Record<NodeKind, string>, ringColors: string[]) => {
-      const state  = stateRef.current;
-      const { width, height } = state;
+  const drawFrame = useCallback((ctx: CanvasRenderingContext2D) => {
+    const config  = LIGHT_CONFIG;
+    const palette = LIGHT_PALETTE;
+    const ringColors = LIGHT_RING_COLORS;
+    const state   = stateRef.current;
+    const { width, height } = state;
 
-      ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
 
-      /* ── Arêtes entre nœuds proches ── */
-      const maxDistSq = config.maxEdgeDistance * config.maxEdgeDistance;
-
-      for (let i = 0; i < state.nodes.length; i++) {
-        for (let j = i + 1; j < state.nodes.length; j++) {
-          const nodeA = state.nodes[i];
-          const nodeB = state.nodes[j];
-          const dSq   = distanceSq(nodeA.x, nodeA.y, nodeB.x, nodeB.y);
-          if (dSq > maxDistSq) continue;
-
-          const ratio   = 1 - Math.sqrt(dSq) / config.maxEdgeDistance;
-          const opacity = Math.max(MIN_EDGE_OPACITY, config.maxEdgeOpacity * ratio);
-
-          ctx.beginPath();
-          ctx.moveTo(nodeA.x, nodeA.y);
-          ctx.lineTo(nodeB.x, nodeB.y);
-          ctx.strokeStyle = isDark
-            ? `rgba(96, 165, 250, ${opacity})`
-            : `rgba(37, 99, 235, ${opacity})`;
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-        }
-      }
-
-      /* ── Nœuds ── */
-      for (const node of state.nodes) {
-        node.blinkPhase = (node.blinkPhase + node.blinkSpeed) % (Math.PI * 2);
-        const blinkFactor = 0.55 + 0.45 * Math.sin(node.blinkPhase);
-        const finalOpacity = node.opacity * blinkFactor * config.maxNodeOpacity;
-        const color        = palette[node.kind];
-
-        /* Halo externe */
-        const gradient = ctx.createRadialGradient(
-          node.x, node.y, 0,
-          node.x, node.y, node.radius * 3.5,
-        );
-        gradient.addColorStop(0, `${color}${Math.round(finalOpacity * 80).toString(16).padStart(2, "0")}`);
-        gradient.addColorStop(1, `${color}00`);
-
+    const maxDistSq = config.maxEdgeDistance * config.maxEdgeDistance;
+    for (let i = 0; i < state.nodes.length; i++) {
+      for (let j = i + 1; j < state.nodes.length; j++) {
+        const a = state.nodes[i];
+        const b = state.nodes[j];
+        const dSq = distanceSq(a.x, a.y, b.x, b.y);
+        if (dSq > maxDistSq) continue;
+        const ratio   = 1 - Math.sqrt(dSq) / config.maxEdgeDistance;
+        const opacity = Math.max(MIN_EDGE_OPACITY, config.maxEdgeOpacity * ratio);
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius * 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        /* Point central */
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        ctx.fillStyle = color + Math.round(finalOpacity * 255).toString(16).padStart(2, "0");
-        ctx.fill();
-
-        /* Mise à jour de la position */
-        node.x += node.vx;
-        node.y += node.vy;
-
-        /* Rebond sur les bords */
-        if (node.x < 0)       { node.x = width;  }
-        if (node.x > width)   { node.x = 0;       }
-        if (node.y < 0)       { node.y = height;  }
-        if (node.y > height)  { node.y = 0;       }
-      }
-
-      /* ── Anneaux de scan ── */
-      for (let i = state.rings.length - 1; i >= 0; i--) {
-        const ring = state.rings[i];
-        ring.radius  += ring.speed;
-        ring.opacity  = config.maxRingOpacity * (1 - ring.radius / ring.maxRadius);
-
-        if (ring.opacity <= 0.005 || ring.radius >= ring.maxRadius) {
-          state.rings.splice(i, 1);
-          continue;
-        }
-
-        ctx.beginPath();
-        ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = ring.color + Math.round(ring.opacity * 255).toString(16).padStart(2, "0");
-        ctx.lineWidth = 1.2;
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = `rgba(37, 99, 235, ${opacity})`;
+        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
+    }
 
-      /* ── Coordonnées flottantes ── */
-      ctx.font = `${12}px ${COORD_FONT_FAMILY}`;
-      for (let i = state.coords.length - 1; i >= 0; i--) {
-        const coord = state.coords[i];
-        coord.age++;
-        coord.y += coord.vy;
+    for (const node of state.nodes) {
+      node.blinkPhase = (node.blinkPhase + node.blinkSpeed) % (Math.PI * 2);
+      const blinkFactor  = 0.55 + 0.45 * Math.sin(node.blinkPhase);
+      const finalOpacity = node.opacity * blinkFactor * config.maxNodeOpacity;
+      const color        = palette[node.kind];
 
-        /* Fade-in / fade-out */
-        const fadeFrames = 25;
-        if (coord.age < fadeFrames) {
-          coord.opacity = (coord.age / fadeFrames) * config.maxCoordOpacity;
-        } else if (coord.age > coord.lifetime - fadeFrames) {
-          coord.opacity = ((coord.lifetime - coord.age) / fadeFrames) * config.maxCoordOpacity;
-        } else {
-          coord.opacity = config.maxCoordOpacity;
-        }
+      const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.radius * 3.5);
+      gradient.addColorStop(0, `${color}${Math.round(finalOpacity * 80).toString(16).padStart(2, "0")}`);
+      gradient.addColorStop(1, `${color}00`);
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.radius * 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
 
-        if (coord.age >= coord.lifetime) {
-          state.coords.splice(i, 1);
-          continue;
-        }
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      ctx.fillStyle = color + Math.round(finalOpacity * 255).toString(16).padStart(2, "0");
+      ctx.fill();
 
-        const textColor = isDark
-          ? `rgba(103, 232, 249, ${coord.opacity})`
-          : `rgba(8, 145, 178, ${coord.opacity})`;
+      // Déplacement
+      node.x += node.vx;
+      node.y += node.vy;
+      if (node.x < -node.radius * 4) node.x = width  + node.radius * 4;
+      if (node.x > width  + node.radius * 4) node.x = -node.radius * 4;
+      if (node.y < -node.radius * 4) node.y = height + node.radius * 4;
+      if (node.y > height + node.radius * 4) node.y = -node.radius * 4;
+    }
 
-        ctx.font = `${coord.fontSize}px ${COORD_FONT_FAMILY}`;
-        ctx.fillStyle = textColor;
-        ctx.fillText(formatCoord(coord.lat, coord.lon), coord.x, coord.y);
-      }
+    // Coordonnées flottantes
+    state.frameCount++;
+    if (state.frameCount % config.coordSpawnInterval === 0 && state.coords.length < 8) {
+      state.coords.push(makeCoord(width, height));
+    }
+    state.coords = state.coords.filter((c) => c.age < c.lifetime);
+    for (const coord of state.coords) {
+      coord.age++;
+      coord.y += coord.vy;
+      const progress = coord.age / coord.lifetime;
+      coord.opacity = progress < 0.15
+        ? (progress / 0.15) * config.maxCoordOpacity
+        : progress > 0.75
+          ? ((1 - progress) / 0.25) * config.maxCoordOpacity
+          : config.maxCoordOpacity;
+      ctx.font = `${coord.fontSize}px ${COORD_FONT_FAMILY}`;
+      ctx.fillStyle = `rgba(37, 99, 235, ${coord.opacity})`;
+      ctx.fillText(formatCoord(coord.lat, coord.lon), coord.x, coord.y);
+    }
 
-      /* ── Spawn périodique ── */
-      state.frameCount++;
+    // Anneaux de scan
+    if (state.frameCount % config.ringSpawnInterval === 0 && state.rings.length < 4) {
+      const color = ringColors[randomInt(0, ringColors.length - 1)];
+      state.rings.push({
+        x: randomBetween(width * 0.1, width * 0.9),
+        y: randomBetween(height * 0.1, height * 0.9),
+        radius: 0,
+        maxRadius: randomBetween(60, 130),
+        speed: randomBetween(0.6, 1.2),
+        opacity: config.maxRingOpacity,
+        color,
+      });
+    }
+    state.rings = state.rings.filter((r) => r.radius < r.maxRadius);
+    for (const ring of state.rings) {
+      ring.radius += ring.speed;
+      ring.opacity = config.maxRingOpacity * (1 - ring.radius / ring.maxRadius);
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = ring.color + Math.round(ring.opacity * 255).toString(16).padStart(2, "0");
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  }, []);
 
-      if (state.frameCount % config.ringSpawnInterval === 0 && state.nodes.length > 0) {
-        const sourceNode = state.nodes[randomInt(0, state.nodes.length - 1)];
-        const ringColor  = ringColors[randomInt(0, ringColors.length - 1)];
-        state.rings.push({
-          x:         sourceNode.x,
-          y:         sourceNode.y,
-          radius:    sourceNode.radius,
-          maxRadius: randomBetween(60, 130),
-          speed:     randomBetween(0.7, 1.4),
-          opacity:   config.maxRingOpacity,
-          color:     ringColor,
-        });
-      }
-
-      if (state.frameCount % config.coordSpawnInterval === 0) {
-        state.coords.push(makeCoord(width, height));
-      }
-    },
-    [isDark],
-  );
-
-  const startLoop = useCallback(() => {
+  const animate = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    drawFrame(ctx);
+    stateRef.current.animId = requestAnimationFrame(animate);
+  }, [drawFrame]);
 
-    const config     = isDark ? DARK_CONFIG  : LIGHT_CONFIG;
-    const palette    = isDark ? DARK_PALETTE : LIGHT_PALETTE;
-    const ringColors = isDark ? DARK_RING_COLORS : LIGHT_RING_COLORS;
-    const state      = stateRef.current;
-
-    const loop = (timestamp: number) => {
-      /* Cap 60fps via delta time */
-      const delta = timestamp - state.lastTime;
-      if (delta >= 14) {
-        state.lastTime = timestamp;
-        drawFrame(ctx, config, palette, ringColors);
-      }
-      state.animId = requestAnimationFrame(loop);
-    };
-
-    state.animId = requestAnimationFrame(loop);
-  }, [isDark, drawFrame]);
-
-  const initCanvas = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const state  = stateRef.current;
-    const dpr    = window.devicePixelRatio || 1;
-    const width  = window.innerWidth;
-    const height = window.innerHeight;
+    function init() {
+      if (!canvas) return;
+      const w   = canvas.offsetWidth  || window.innerWidth;
+      const h   = canvas.offsetHeight || window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width  = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.scale(dpr, dpr);
+      stateRef.current.width  = w;
+      stateRef.current.height = h;
+      stateRef.current.nodes  = Array.from({ length: LIGHT_CONFIG.nodeCount }, () => makeNode(w, h));
+      stateRef.current.coords = [];
+      stateRef.current.rings  = [];
+      stateRef.current.frameCount = 0;
+    }
 
-    canvas.width  = width  * dpr;
-    canvas.height = height * dpr;
-    canvas.style.width  = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    const ctx = canvas.getContext("2d");
-    ctx?.scale(dpr, dpr);
-
-    state.width  = width;
-    state.height = height;
-
-    const config = isDark ? DARK_CONFIG : LIGHT_CONFIG;
-
-    state.nodes  = Array.from({ length: config.nodeCount }, () => makeNode(width, height));
-    state.coords = Array.from({ length: 3 }, () => makeCoord(width, height));
-    state.rings  = [];
-    state.frameCount = 0;
-    state.lastTime   = 0;
-  }, [isDark]);
-
-  useEffect(() => {
-    /* Arrêt propre d'une éventuelle boucle précédente */
-    cancelAnimationFrame(stateRef.current.animId);
-
-    initCanvas();
-    startLoop();
-
-    const handleResize = () => {
+    init();
+    const observer = new ResizeObserver(() => {
       cancelAnimationFrame(stateRef.current.animId);
-      initCanvas();
-      startLoop();
-    };
-
-    window.addEventListener("resize", handleResize);
+      init();
+      stateRef.current.animId = requestAnimationFrame(animate);
+    });
+    observer.observe(canvas);
+    stateRef.current.animId = requestAnimationFrame(animate);
 
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(stateRef.current.animId);
-      window.removeEventListener("resize", handleResize);
     };
-  }, [isDark, initCanvas, startLoop]);
+  }, [animate]);
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      style={{
-        position:      "fixed",
-        inset:         0,
-        zIndex:        0,
-        pointerEvents: "none",
-        display:       "block",
-      }}
+      className="pointer-events-none fixed inset-0 z-0 h-full w-full"
     />
   );
+}
+
+/* ── Export principal ───────────────────────────────────────── */
+export default function GeoParticlesBackground({ isDark }: GeoParticlesBackgroundProps) {
+  if (isDark) return <NebulaVideoBackground />;
+  return <ParticlesBackground />;
 }
