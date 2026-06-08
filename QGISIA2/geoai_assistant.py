@@ -4584,6 +4584,35 @@ class ThreadedAssetServer:
                 })
                 return True
 
+            # ── Outils natifs en-process (sans bridge QGIS) ───────────────
+            # IMPLÉMENTÉ PAR DEVIN CLI (Cognition AI)
+            # Superviseur : Claude Code 4.8 — Camil | 2026-06-08
+            if route.startswith("/api/native/"):
+                tool_name = route.split("/api/native/")[-1]
+                try:
+                    from native_tools import NATIVE_TOOLS, _default_get_json
+                except ImportError:
+                    from .native_tools import NATIVE_TOOLS, _default_get_json
+                native_map = {t.name: t for t in NATIVE_TOOLS}
+                tool = native_map.get(tool_name)
+                if tool is None:
+                    self._send_json(handler, 404, {
+                        "ok": False,
+                        "error": f"Outil natif inconnu: {tool_name}",
+                        "available": list(native_map.keys()),
+                    })
+                    return True
+                try:
+                    native_result = tool.executor(body, _default_get_json)
+                    self._send_json(handler, 200, {"ok": True, "result": native_result})
+                except Exception as native_exc:  # noqa: BLE001
+                    self._send_json(handler, 500, {
+                        "ok": False,
+                        "error": str(native_exc),
+                        "tool": tool_name,
+                    })
+                return True
+
             return False
         except Exception as exc:
             self._send_json(handler, 500, {

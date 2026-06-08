@@ -48,12 +48,17 @@ def test_tool_catalog_includes_sprint_features():
 
 
 def test_each_tool_has_valid_schema():
+    # Endpoints valides : /api/qgis/* (bridge QGIS) ou /api/native/* (en-process)
+    # MODIFIÉ PAR DEVIN CLI — Superviseur : Claude Code 4.8 — 2026-06-08
+    valid_prefixes = ("/api/qgis/", "/api/native/")
     for tool in TOOL_CATALOG:
         assert tool.name and isinstance(tool.name, str)
         assert tool.description and len(tool.description) > 10
         assert isinstance(tool.input_schema, dict)
         assert tool.input_schema.get("type") == "object"
-        assert tool.endpoint.startswith("/api/qgis/")
+        assert any(tool.endpoint.startswith(p) for p in valid_prefixes), (
+            f"Endpoint inattendu pour {tool.name}: {tool.endpoint}"
+        )
         assert callable(tool.payload_builder)
 
 
@@ -196,3 +201,66 @@ def test_mcptoolspec_dataclass_construction():
     )
     assert spec.name == "x"
     assert spec.payload_builder({"k": "v"}) == {"k": "v"}
+
+
+# ── Outils natifs dans le catalogue MCP (Devin CLI — 2026-06-08) ─────────────
+
+
+def test_catalog_includes_predict_trend():
+    """predictTrend doit être présent dans le catalogue MCP."""
+    tool = get_tool("predictTrend")
+    assert tool is not None
+    assert tool.endpoint == "/api/native/predict_trend"
+
+
+def test_catalog_includes_parse_voice_intent():
+    """parseVoiceIntent doit être présent dans le catalogue MCP."""
+    tool = get_tool("parseVoiceIntent")
+    assert tool is not None
+    assert tool.endpoint == "/api/native/parse_voice_intent"
+
+
+def test_predict_trend_schema_has_required_points():
+    tool = get_tool("predictTrend")
+    assert "points" in tool.input_schema.get("required", [])
+
+
+def test_parse_voice_intent_schema_has_required_text():
+    tool = get_tool("parseVoiceIntent")
+    assert "text" in tool.input_schema.get("required", [])
+
+
+@pytest.mark.asyncio
+async def test_dispatch_predict_trend_routes_to_native_endpoint():
+    """dispatch_tool_call doit router predictTrend vers /api/native/predict_trend."""
+    mock_response = MagicMock()
+    mock_response.text = '{"ok": true, "result": {"trend": {}, "classification": "stable"}}'
+    mock_response.raise_for_status = MagicMock()
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    await dispatch_tool_call(
+        "predictTrend",
+        {"points": [[0, 0.5], [1, 0.48], [2, 0.46]], "horizon": 2},
+        http_client=mock_client,
+    )
+    url = mock_client.post.call_args.args[0]
+    assert "/api/native/predict_trend" in url
+
+
+@pytest.mark.asyncio
+async def test_dispatch_parse_voice_intent_routes_to_native_endpoint():
+    """dispatch_tool_call doit router parseVoiceIntent vers /api/native/parse_voice_intent."""
+    mock_response = MagicMock()
+    mock_response.text = '{"ok": true, "result": {"action": "add_basemap"}}'
+    mock_response.raise_for_status = MagicMock()
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    await dispatch_tool_call(
+        "parseVoiceIntent",
+        {"text": "Ajoute un fond de carte"},
+        http_client=mock_client,
+    )
+    url = mock_client.post.call_args.args[0]
+    assert "/api/native/parse_voice_intent" in url

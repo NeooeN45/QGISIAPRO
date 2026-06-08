@@ -689,6 +689,56 @@ TOOL_CATALOG: list[McpToolSpec] = [
         endpoint="/api/qgis/renderMapView",
         payload_builder=_direct_payload,
     ),
+    # ── Outils natifs (en-process, sans bridge QGIS) ──────────────────────────
+    # IMPLÉMENTÉ PAR DEVIN CLI (Cognition AI) — Superviseur : Claude Code 4.8 — 2026-06-08
+    McpToolSpec(
+        name="predictTrend",
+        description=(
+            "Projeter une tendance temporelle sur une série d'indices (ex: dNDVI). "
+            "points=[[t,valeur],...]. Renvoie pente, r², projection et classification "
+            "(degradation/stable/amelioration). Utile pour anticiper déforestation, "
+            "artificialisation, inondation."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "points": {
+                    "type": "array",
+                    "items": {"type": "array"},
+                    "description": "Série [[t, valeur], ...] (t=indice temps, ex: 0,1,2,...)",
+                },
+                "horizon": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Nombre de pas de temps à projeter",
+                },
+            },
+            "required": ["points"],
+        },
+        endpoint="/api/native/predict_trend",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="parseVoiceIntent",
+        description=(
+            "Interpréter une phrase utilisateur en action cartographique structurée. "
+            "Ex: 'Ajoute un fond de carte' → {action: add_basemap}. "
+            "Actions reconnues: add_basemap, compute_ndvi, buffer, load_satellite, "
+            "export_layout. À enchaîner avec l'outil correspondant."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Phrase utilisateur en français ou anglais",
+                },
+            },
+            "required": ["text"],
+        },
+        endpoint="/api/native/parse_voice_intent",
+        payload_builder=_direct_payload,
+    ),
 ]
 
 
