@@ -43,10 +43,10 @@ function BlinkingCursor() {
           display: inline-block;
           width: 2px;
           height: 1.1em;
-          background: currentColor;
+          background: linear-gradient(180deg, #34d399, #059669);
           margin-left: 2px;
           vertical-align: text-bottom;
-          border-radius: 1px;
+          border-radius: 2px;
           animation: qgis-cursor-blink 0.9s step-start infinite;
         }
       `}</style>
@@ -272,9 +272,9 @@ export default function StreamingMessage({ className }: StreamingMessageProps) {
                */}
               <motion.div
                 key={_chunks.length}            // change à chaque nouveau chunk
-                initial={{ opacity: 0.7 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: CHUNK_FADE_DURATION_S }}
+                initial={{ opacity: 0, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
               >
                 <ReasoningPhasesView
                   text={streamedText}

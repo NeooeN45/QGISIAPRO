@@ -814,7 +814,40 @@ export default function App() {
                 ? error.stack
                 : JSON.stringify(error, null, 2),
           });
-          toast.error(message);
+
+          // Message d'erreur enrichi selon le type
+          const isNetworkError = message.includes("404") || message.includes("503") || message.includes("502") || message.includes("fetch") || message.includes("Failed to fetch") || message.includes("network");
+          const isAuthError    = message.includes("401") || message.includes("403") || message.includes("API key") || message.includes("Unauthorized");
+          const isTimeoutError = message.includes("timeout") || message.includes("408") || message.includes("aborted");
+
+          const errorTitle = isNetworkError
+            ? "Connexion au serveur impossible"
+            : isAuthError
+            ? "Clé API invalide ou manquante"
+            : isTimeoutError
+            ? "Délai d'attente dépassé"
+            : "Erreur de génération";
+
+          const errorDescription = isNetworkError
+            ? `Le backend QGIS n'est pas joignable. Vérifiez que le plugin est bien lancé dans QGIS et que le serveur HTTP tourne sur le bon port.
+
+Détail : ${message}`
+            : isAuthError
+            ? `Votre clé API est introuvable ou incorrecte. Rendez-vous dans Paramètres → Clé API pour la mettre à jour.
+
+Détail : ${message}`
+            : isTimeoutError
+            ? `Le modèle n'a pas répondu dans le délai imparti. Réessayez ou sélectionnez un modèle plus rapide.
+
+Détail : ${message}`
+            : `Une erreur inattendue s'est produite lors de la génération de la réponse.
+
+Détail : ${message}`;
+
+          toast.error(errorTitle, {
+            description: errorDescription,
+            duration: 9000,
+          });
         }
       } finally {
         setIsLoading(false);

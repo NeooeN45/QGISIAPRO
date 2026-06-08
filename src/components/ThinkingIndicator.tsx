@@ -112,20 +112,10 @@ const progressLabels = (p: number): string => {
 
 // ─── Sous-composants ──────────────────────────────────────────────────────────
 
-/** 3 cercles en orbite autour d'un centre invisible */
-function OrbitDots() {
+/** Orbite positionnée en overlay absolu sur le conteneur parent (avatar 40x40) */
+function OrbitRing() {
   return (
-    <div
-      className="relative shrink-0"
-      style={{ width: 32, height: 32 }}
-      aria-hidden
-    >
-      {/* Anneau fantôme — aide à visualiser le plan orbital */}
-      <div
-        className="absolute inset-0 rounded-full border border-white/5"
-        style={{ margin: 2 }}
-      />
-
+    <>
       {ORBIT_DOTS.map(({ color, delayFraction }, i) => (
         <motion.div
           key={i}
@@ -135,26 +125,27 @@ function OrbitDots() {
             duration: ORBIT_DURATION_S,
             repeat: Infinity,
             ease: "linear",
-            delay: -(ORBIT_DURATION_S * delayFraction), // phase offset immédiat
+            delay: -(ORBIT_DURATION_S * delayFraction),
           }}
           style={{ transformOrigin: "50% 50%" }}
+          aria-hidden
         >
-          {/* Le point est décalé vers le haut depuis le centre (radius) */}
           <div
             className="absolute rounded-full"
             style={{
-              width: 4,
-              height: 4,
+              width: 5,
+              height: 5,
               background: color,
-              boxShadow: `0 0 6px 1px ${color}99`,
+              boxShadow: `0 0 7px 2px ${color}99`,
               left: "50%",
               top: "50%",
-              transform: `translate(-50%, calc(-50% - ${ORBIT_RADIUS_PX}px))`,
+              /* Rayon = moitié du conteneur (20px) + 8px débordement */
+              transform: `translate(-50%, calc(-50% - ${ORBIT_RADIUS_PX + 8}px))`,
             }}
           />
         </motion.div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -262,15 +253,18 @@ export default function ThinkingIndicator({
   return (
     <div className="flex gap-4 md:gap-6">
       {/* ── Avatar ────────────────────────────────────────────────────────── */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-gray-200 dark:border-[#333537] bg-gray-100 dark:bg-[#1e1f20] shadow-lg relative overflow-hidden">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-gray-200 dark:border-[#333537] bg-gray-100 dark:bg-[#1e1f20] shadow-lg relative overflow-visible">
         {/* Fond dégradé pulsant */}
         <motion.div
-          className={`absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-20`}
+          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradientClass} opacity-20`}
           animate={{ opacity: [0.1, 0.35, 0.1] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
+        {/* Orbite autour de l'avatar */}
+        <OrbitRing />
         {/* Icône oscillante */}
         <motion.div
+          className="relative z-10"
           animate={{ scale: [1, 1.12, 1], rotate: [0, 6, -6, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
@@ -283,9 +277,6 @@ export default function ThinkingIndicator({
 
         {/* Bulle principale */}
         <div className="flex items-center gap-3 rounded-[28px] border border-gray-200 dark:border-[#333537]/40 bg-white dark:bg-[#1e1f20]/60 p-5 shadow-sm dark:backdrop-blur-sm">
-
-          {/* Orbite */}
-          <OrbitDots />
 
           {/* Phrase animée avec blur */}
           <div className="flex-1 min-w-0">
