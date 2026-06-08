@@ -96,7 +96,7 @@
    ─────────────────────────────────────────────*/
 :root {
   /* — Background */
-  --background-base:      #ffffff;
+  --background-base:      transparent;
   --background-elevated:  #f9fafb;
   --background-sunken:    #f3f4f6;
   --background-overlay:   rgba(255, 255, 255, 0.85);
@@ -150,7 +150,7 @@
   --glow-violet:  0 0 0 1px rgba(139, 92, 246, 0.20), 0 0 16px rgba(139, 92, 246, 0.15), 0 0 32px rgba(139, 92, 246, 0.08);
 
   /* — Tokens hérités (compatibilité composants existants) */
-  --background:     #ffffff;
+  --background:     transparent;
   --foreground:     #0f172a;
   --primary:        var(--primitive-blue-500);
   --radius:         var(--primitive-radius-md);
@@ -171,7 +171,7 @@
    ─────────────────────────────────────────────*/
 .dark {
   /* — Background */
-  --background-base:      #0c0d0f;
+  --background-base:      transparent;
   --background-elevated:  #131416;
   --background-sunken:    #0a0b0c;
   --background-overlay:   rgba(12, 13, 15, 0.90);
@@ -241,7 +241,7 @@
    4. BASE — Reset & typographie
    ─────────────────────────────────────────────*/
 body {
-  background-color: var(--background-base);
+  background-color: transparent;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";

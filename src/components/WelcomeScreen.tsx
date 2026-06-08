@@ -286,7 +286,7 @@ const getDynamicSuggestions = (
     accentColor: "yellow",
   });
 
-  return contextualSuggestions.slice(0, 8);
+  return contextualSuggestions.slice(0, 4);
 };
 
 // ── Utility: format sequence number ──────────────────────────────────────────
@@ -506,9 +506,8 @@ export default function WelcomeScreen({
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="flex flex-col items-start"
       >
-        {/* Logo + title row */}
-        <div className="flex items-center gap-4">
-          <OctagonLogo />
+        {/* Title */}
+        <div>
           <div>
             <h1
               className="bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400 bg-[length:200%_auto] bg-clip-text text-3xl font-bold tracking-tight text-transparent md:text-4xl"
@@ -548,7 +547,7 @@ export default function WelcomeScreen({
             },
           },
         }}
-        className="w-full grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        className="w-full grid gap-2.5 sm:grid-cols-2"
       >
         {suggestions.map((suggestion, index) => (
           <SuggestionCard
