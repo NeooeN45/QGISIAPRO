@@ -4172,6 +4172,9 @@ class ThreadedAssetServer:
                     query = body.get("query", "")
                     top_k = int(body.get("top_k", 5))
                     collections = body.get("collections")
+                    # Active les embeddings sémantiques NIM si une clé est fournie.
+                    nim_key = (body.get("api_keys") or {}).get("nvidia_nim")
+                    get_indexer()._store.configure(nim_key)
                     context = get_indexer().search_for_prompt(query, top_k=top_k, collections=collections)
                     results_raw = get_indexer()._store.search(query, top_k=top_k)
                     self._send_json(handler, 200, {"ok": True,
@@ -4191,6 +4194,8 @@ class ThreadedAssetServer:
                 try:
                     from .rag_indexer import get_indexer
                     force = bool(body.get("force", False))
+                    nim_key = (body.get("api_keys") or {}).get("nvidia_nim")
+                    get_indexer()._store.configure(nim_key)
                     n = get_indexer().index_pyqgis_knowledge(force=force)
                     self._send_json(handler, 200, {"ok": True, "indexed": n})
                 except Exception as e:

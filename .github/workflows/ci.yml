@@ -50,7 +50,7 @@ jobs:
         run: python -m compileall -q QGISIA2 scripts
       - name: Security unit tests (bloquant)
         # Tests purs sans dépendance QGIS/live, garants de la couche sécurité.
-        run: pytest tests/test_security_layer.py tests/test_script_validation.py tests/test_gateway_budget.py -q
+        run: pytest tests/test_security_layer.py tests/test_script_validation.py tests/test_gateway_budget.py tests/test_rag_embeddings.py -q
       - name: Broader unit tests — informatif
         # Beaucoup de tests dépendent (parfois transitivement) de l'environnement
         # QGIS ou d'appels live ; exécutés en non-bloquant tant qu'un harnais QGIS
