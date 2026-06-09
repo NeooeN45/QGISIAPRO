@@ -1,16 +1,6 @@
-import * as pdfjsLib from "pdfjs-dist";
-import JSZip from "jszip";
-import mammoth from "mammoth";
-
-// Initialize PDF.js worker avec gestion d'erreur
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
-    import.meta.url
-  ).toString();
-} catch (error) {
-  console.warn("[Document Utils] PDF.js worker initialization failed:", error);
-}
+// NOTE PERF : pdfjs-dist, mammoth et jszip sont importés DYNAMIQUEMENT dans les
+// branches qui les utilisent. Cela évite de charger ~1,5 Mo de code au boot ;
+// ces libs ne sont récupérées que lorsqu'un PDF/DOCX/XLSX est réellement traité.
 
 export async function extractTextFromFile(file: File): Promise<string> {
   const fileType = file.type;
@@ -59,12 +49,15 @@ export async function extractTextFromFile(file: File): Promise<string> {
   if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      
-      // Vérifier si le worker est configuré
+
+      // Import dynamique : pdfjs n'est chargé que pour traiter un PDF.
+      const pdfjsLib = await import("pdfjs-dist");
       if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        console.warn("[PDF] Worker non configuré, utilisation du mode legacy");
+        const workerUrl = (await import("pdfjs-dist/build/pdf.worker.mjs?url"))
+          .default as string;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
       }
-      
+
       const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
       let fullText = "";
@@ -103,6 +96,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
   ) {
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const mammoth = (await import("mammoth")).default;
       const result = await mammoth.extractRawText({ arrayBuffer });
       return result.value;
     } catch (error) {
@@ -118,6 +112,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
   ) {
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(arrayBuffer);
       
       // Try to find shared strings which contain most of the text in XLSX
