@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 Script de debug pour l'installation Gateway IA.
 À exécuter dans la console Python de QGIS:
 

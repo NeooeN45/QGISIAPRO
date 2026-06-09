@@ -132,10 +132,19 @@ Détails complets : [`docs/AGENTIC_BACKEND.md`](docs/AGENTIC_BACKEND.md).
 
 ## 🔒 Sécurité
 
-- Clés API **chiffrées** (jamais envoyées au serveur sans action utilisateur), jamais commitées.
-- L'exécution de code PyQGIS arbitraire passe par les **guardrails** : les actions
-  critiques (`DROP TABLE`, suppression de fichiers…) sont **bloquées**, les actions
-  destructives demandent confirmation (sauf Mode Auto).
+- **Clés API** : chiffrées au repos via **AES-GCM 256 bits** (WebCrypto), avec une
+  clé maître *non extractible* stockée dans IndexedDB ; jamais commitées, jamais
+  envoyées au serveur sans action utilisateur. ⚠️ Pour une app côté client, aucun
+  schéma local n'est inviolable face à un XSS/attaquant local — pour un secret
+  hautement sensible, préférer un stockage backend (QgsSettings / keychain OS).
+- **Exécution PyQGIS** : tout script généré par l'IA passe par une **double
+  validation** avant `exec()` — blocklist regex *et* analyse AST (imports
+  dangereux, accès dunder d'évasion, builtins `eval`/`exec`/`open`…) — puis par
+  les **guardrails** (actions destructives bloquées ou soumises à confirmation,
+  sauf Mode Auto). Note : ce n'est pas un sandbox complet ; ne pas exposer le
+  bridge hors `127.0.0.1`.
+- **Bridge HTTP local** : écoute uniquement sur `127.0.0.1`, CORS restreint aux
+  origines locales, taille de requête bornée, rate-limiting actif.
 
 ---
 

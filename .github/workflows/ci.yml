@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "chore/**", "feat/**", "fix/**"]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (TS + Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install tooling + deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      - name: Lint (ruff) — informatif
+        run: ruff check QGISIA2 tests scripts
+        continue-on-error: true
+      - name: Syntax check (bloquant)
+        run: python -m compileall -q QGISIA2 scripts
+      - name: Security unit tests (bloquant)
+        # Tests purs sans dépendance QGIS/live, garants de la couche sécurité.
+        run: pytest tests/test_security_layer.py tests/test_script_validation.py -q
+      - name: Broader unit tests — informatif
+        # Beaucoup de tests dépendent (parfois transitivement) de l'environnement
+        # QGIS ou d'appels live ; exécutés en non-bloquant tant qu'un harnais QGIS
+        # headless n'est pas en place.
+        run: pytest tests -q --continue-on-collection-errors
+        continue-on-error: true
