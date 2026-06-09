@@ -150,6 +150,7 @@ def _build_completion_kwargs(
     temperature: Optional[float],
     max_tokens: Optional[int],
     tools: Optional[List[Dict[str, Any]]],
+    timeout: Optional[float] = None,
 ) -> Dict[str, Any]:
     kwargs: Dict[str, Any] = {
         "model": model,
@@ -162,6 +163,9 @@ def _build_completion_kwargs(
         kwargs["max_tokens"] = max_tokens
     if tools:
         kwargs["tools"] = tools
+    if timeout is not None:
+        # litellm propage `timeout` au client HTTP du provider.
+        kwargs["timeout"] = timeout
 
     provider = _extract_provider(model)
     api_key = api_keys.get(provider)
@@ -204,16 +208,36 @@ def _build_completion_kwargs(
     return kwargs
 
 
-def _check_budget(cfg: Dict[str, Any]) -> None:
+def budget_status(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Retourne l'état du budget journalier et lève si le plafond est atteint.
+
+    Renvoie {spent_usd, daily_max_usd, percent, warning} où `warning` passe à
+    True dès que le seuil `warn_at_percent` (def. 80%) est franchi.
+    """
     budgets = cfg.get("budgets", {})
     daily_max = budgets.get("daily_max_usd")
-    if daily_max is None:
-        return
     snap = _budget.snapshot()
-    if snap["total_usd"] >= daily_max:
+    spent = snap["total_usd"]
+    if daily_max is None:
+        return {"spent_usd": spent, "daily_max_usd": None, "percent": None, "warning": False}
+
+    percent = round((spent / daily_max) * 100, 1) if daily_max else 0.0
+    if spent >= daily_max:
         raise BudgetExceededError(
-            f"Budget quotidien atteint: {snap['total_usd']}$ / {daily_max}$"
+            f"Budget quotidien atteint: {spent}$ / {daily_max}$"
         )
+    warn_at = budgets.get("warn_at_percent", 80)
+    return {
+        "spent_usd": spent,
+        "daily_max_usd": daily_max,
+        "percent": percent,
+        "warning": percent >= warn_at,
+    }
+
+
+def _check_budget(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Compat : vérifie le budget (lève si dépassé) et retourne le statut."""
+    return budget_status(cfg)
 
 
 def chat(
@@ -242,15 +266,21 @@ def chat(
 
     api_keys = api_keys or {}
     cfg = load_config()
-    _check_budget(cfg)
+    budget = _check_budget(cfg)
 
     resolved = resolve_alias(model)
     candidates: List[str] = [resolved["primary"], *resolved.get("fallbacks", [])]
 
     retry_cfg = cfg.get("retry", {})
+    max_attempts = int(retry_cfg.get("max_attempts", len(candidates)) or len(candidates))
+    backoff: List[float] = retry_cfg.get("backoff_seconds", []) or []
+    timeout_s = retry_cfg.get("request_timeout_seconds")
     last_error: Optional[Exception] = None
 
+    attempts_made = 0
     for attempt, candidate in enumerate(candidates):
+        if attempts_made >= max_attempts:
+            break
         kwargs = _build_completion_kwargs(
             model=candidate,
             messages=messages,
@@ -259,6 +289,7 @@ def chat(
             temperature=temperature if temperature is not None else resolved.get("temperature"),
             max_tokens=max_tokens,
             tools=tools,
+            timeout=timeout_s,
         )
         try:
             if stream:
@@ -271,10 +302,16 @@ def chat(
                 "model_used": candidate,
                 "attempt": attempt,
                 "latency_ms": int((time.time() - start) * 1000),
+                "budget": budget,
             }
             return response_dict
         except Exception as exc:  # pylint: disable=broad-except
             last_error = exc
+            attempts_made += 1
+            # Backoff avant le prochain candidat (sauf dernier essai).
+            has_next = attempts_made < max_attempts and attempt < len(candidates) - 1
+            if has_next and backoff:
+                time.sleep(backoff[min(attempt, len(backoff) - 1)])
             continue
 
     raise RuntimeError(f"Tous les modeles ont echoue. Dernier: {last_error}")
