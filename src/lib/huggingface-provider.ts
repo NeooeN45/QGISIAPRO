@@ -3,7 +3,7 @@
  * Permet d'utiliser des modèles HF (comme Gemma 4) via l'API
  */
 
-import { encryptApiKey, decryptApiKey } from "./encryption";
+import { encryptApiKeyAsync, decryptApiKeyAsync } from "./encryption";
 
 export interface HuggingFaceOptions {
   temperature?: number;
@@ -39,17 +39,17 @@ export async function getHuggingFaceApiKey(): Promise<string | null> {
   if (!encrypted) return null;
   
   try {
-    return decryptApiKey(encrypted);
+    return await decryptApiKeyAsync(encrypted);
   } catch {
     return null;
   }
 }
 
 /**
- * Sauvegarde la clé API chiffrée
+ * Sauvegarde la clé API chiffrée (AES-GCM).
  */
-export function setHuggingFaceApiKey(apiKey: string): void {
-  const encrypted = encryptApiKey(apiKey);
+export async function setHuggingFaceApiKey(apiKey: string): Promise<void> {
+  const encrypted = await encryptApiKeyAsync(apiKey);
   localStorage.setItem("hf_api_key_encrypted", encrypted);
 }
 

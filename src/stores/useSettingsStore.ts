@@ -5,7 +5,7 @@ import {
   loadStoredSettings,
   normalizeSettings,
 } from "../lib/settings";
-import { decryptApiKey, encryptApiKey } from "../lib/encryption";
+import { decryptApiKeyAsync, encryptApiKeyAsync } from "../lib/encryption";
 
 interface SettingsState {
   settings: AppSettings;
@@ -17,40 +17,44 @@ interface SettingsState {
 const STORAGE_KEY = "geoai-settings";
 
 /**
- * Chiffre les clés API avant persistance
+ * Chiffre les clés API avant persistance (AES-GCM).
  */
-function encryptSettingsForStorage(settings: AppSettings): AppSettings {
+async function encryptSettingsForStorage(settings: AppSettings): Promise<AppSettings> {
   return {
     ...settings,
-    apiKey: encryptApiKey(settings.apiKey),
-    googleApiKey: encryptApiKey(settings.googleApiKey),
-    openrouterApiKey: encryptApiKey(settings.openrouterApiKey),
+    apiKey: await encryptApiKeyAsync(settings.apiKey),
+    googleApiKey: await encryptApiKeyAsync(settings.googleApiKey),
+    openrouterApiKey: await encryptApiKeyAsync(settings.openrouterApiKey),
   };
 }
 
 /**
- * Déchiffre les clés API après chargement
+ * Déchiffre les clés API après chargement (gère v2 AES-GCM + v1 XOR legacy).
  */
-function decryptSettingsFromStorage(settings: AppSettings): AppSettings {
+async function decryptSettingsFromStorage(settings: AppSettings): Promise<AppSettings> {
   return {
     ...settings,
-    apiKey: decryptApiKey(settings.apiKey),
-    googleApiKey: decryptApiKey(settings.googleApiKey),
-    openrouterApiKey: decryptApiKey(settings.openrouterApiKey),
+    apiKey: await decryptApiKeyAsync(settings.apiKey),
+    googleApiKey: await decryptApiKeyAsync(settings.googleApiKey),
+    openrouterApiKey: await decryptApiKeyAsync(settings.openrouterApiKey),
   };
 }
 
+/** Persiste les réglages en chiffrant les clés. Fire-and-forget. */
 function persistSettings(settings: AppSettings): void {
-  try {
-    const encrypted = encryptSettingsForStorage(settings);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
-  } catch {
-    // silent fail
-  }
+  void (async () => {
+    try {
+      const encrypted = await encryptSettingsForStorage(settings);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
+    } catch {
+      // silent fail
+    }
+  })();
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  settings: normalizeSettings(decryptSettingsFromStorage(loadStoredSettings())),
+  // Init synchrone : clés encore chiffrées, déchiffrées par l'hydratation async.
+  settings: normalizeSettings(loadStoredSettings()),
 
   setSettings: (settings) => {
     const normalized = normalizeSettings(settings);
@@ -66,8 +70,20 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     }),
 
   resetSettings: () => {
-    const fresh = normalizeSettings(decryptSettingsFromStorage(loadStoredSettings()));
-    persistSettings(fresh);
-    set({ settings: fresh });
+    void (async () => {
+      const fresh = normalizeSettings(await decryptSettingsFromStorage(loadStoredSettings()));
+      persistSettings(fresh);
+      set({ settings: fresh });
+    })();
   },
 }));
+
+/** Hydratation asynchrone : déchiffre les clés API au démarrage. */
+void (async () => {
+  try {
+    const decrypted = await decryptSettingsFromStorage(loadStoredSettings());
+    useSettingsStore.setState({ settings: normalizeSettings(decrypted) });
+  } catch {
+    // silent fail : on garde les réglages bruts
+  }
+})();

@@ -5,7 +5,7 @@
  * Jamais envoyees au serveur sans action utilisateur explicite (via litellm-client).
  */
 import { create } from "zustand";
-import { decryptApiKey, encryptApiKey } from "../lib/encryption";
+import { decryptApiKeyAsync, encryptApiKeyAsync } from "../lib/encryption";
 import type { ApiKeys } from "../lib/litellm-client";
 
 const STORAGE_KEY = "qgisia-gateway-v1";
@@ -40,25 +40,26 @@ const ENCRYPTED_KEY_FIELDS: (keyof ApiKeys)[] = [
   "openai", "nvidia_nim", "groq", "cerebras", "mistral",
 ];
 
-function encryptKeys(keys: ApiKeys): ApiKeys {
+async function encryptKeys(keys: ApiKeys): Promise<ApiKeys> {
   const out: ApiKeys = { ollama_base_url: keys.ollama_base_url };
   for (const field of ENCRYPTED_KEY_FIELDS) {
     const v = keys[field];
-    if (v) (out as Record<string, string>)[field] = encryptApiKey(v);
+    if (v) (out as Record<string, string>)[field] = await encryptApiKeyAsync(v);
   }
   return out;
 }
 
-function decryptKeys(keys: ApiKeys): ApiKeys {
+async function decryptKeys(keys: ApiKeys): Promise<ApiKeys> {
   const out: ApiKeys = { ollama_base_url: keys.ollama_base_url };
   for (const field of ENCRYPTED_KEY_FIELDS) {
     const v = keys[field];
-    if (v) (out as Record<string, string>)[field] = decryptApiKey(v);
+    if (v) (out as Record<string, string>)[field] = await decryptApiKeyAsync(v);
   }
   return out;
 }
 
-function loadConfig(): GatewayConfig {
+/** Lit la config brute (clés encore chiffrées) de façon synchrone pour l'init. */
+function loadRawConfig(): GatewayConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_CONFIG;
@@ -66,7 +67,8 @@ function loadConfig(): GatewayConfig {
     return {
       ...DEFAULT_CONFIG,
       ...parsed,
-      apiKeys: decryptKeys(parsed.apiKeys ?? {}),
+      // apiKeys restent chiffrées ici ; déchiffrées par l'hydratation async.
+      apiKeys: { ollama_base_url: parsed.apiKeys?.ollama_base_url ?? DEFAULT_CONFIG.apiKeys.ollama_base_url },
       status: "unknown",
       lastError: undefined,
     };
@@ -75,16 +77,19 @@ function loadConfig(): GatewayConfig {
   }
 }
 
+/** Persiste la config en chiffrant les clés (AES-GCM). Fire-and-forget. */
 function persistConfig(config: GatewayConfig): void {
-  try {
-    const serialized: GatewayConfig = {
-      ...config,
-      apiKeys: encryptKeys(config.apiKeys),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
-  } catch {
-    // silent fail
-  }
+  void (async () => {
+    try {
+      const serialized: GatewayConfig = {
+        ...config,
+        apiKeys: await encryptKeys(config.apiKeys),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
+    } catch {
+      // silent fail
+    }
+  })();
 }
 
 interface GatewayStore {
@@ -103,7 +108,7 @@ interface GatewayStore {
 }
 
 export const useGatewayStore = create<GatewayStore>((set, get) => ({
-  config: loadConfig(),
+  config: loadRawConfig(),
 
   setApiKey: (provider, value) =>
     set((state) => {
@@ -174,3 +179,22 @@ export const useGatewayStore = create<GatewayStore>((set, get) => ({
     set({ config: DEFAULT_CONFIG });
   },
 }));
+
+/**
+ * Hydratation asynchrone : déchiffre les clés API (AES-GCM, ou XOR legacy en
+ * migration) puis les injecte dans le store. Au prochain `persistConfig`, les
+ * clés legacy seront automatiquement réécrites au format v2.
+ */
+void (async () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as GatewayConfig;
+    const apiKeys = await decryptKeys(parsed.apiKeys ?? {});
+    useGatewayStore.setState((state) => ({
+      config: { ...state.config, apiKeys },
+    }));
+  } catch {
+    // silent fail : on garde la config par défaut
+  }
+})();
