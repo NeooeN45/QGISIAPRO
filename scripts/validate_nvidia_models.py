@@ -1,275 +1,223 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Validation complete : cle API NVIDIA NIM + test de chaque modele disponible.
-Genere un rapport JSON + console colorée.
-"""
+Validation LIVE du catalogue NVIDIA NIM (juin 2026).
 
+Teste chaque modele candidat via le gateway LiteLLM et ecrit le resultat dans
+QGISIA2/config/models.validated.json (modeles OK + latences + erreurs).
+
+Securite : la cle API n'est JAMAIS en dur. Elle est lue depuis argv[1] ou la
+variable d'environnement NVIDIA_API_KEY. Le script sort en erreur si absente.
+
+Usage :
+    python scripts/validate_nvidia_models.py <NVIDIA_API_KEY>
+    # ou : $env:NVIDIA_API_KEY='nvapi-...' ; python scripts/validate_nvidia_models.py
+    python scripts/validate_nvidia_models.py --dry-run   # liste les candidats, 0 appel reseau
+"""
+from __future__ import annotations
+
+import json
 import os
 import sys
-import json
 import time
-import re
 from pathlib import Path
 
-# ── Config ───────────────────────────────────────────────────────────────────
+# Racine + plugin sur le path (scripts/ est 1 niveau sous la racine)
+ROOT = Path(__file__).resolve().parent.parent
+PLUGIN_DIR = ROOT / "QGISIA2"
+VENDOR_DIR = PLUGIN_DIR / "vendor"
+for p in (VENDOR_DIR, PLUGIN_DIR):
+    if p.is_dir() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
-API_BASE = "https://integrate.api.nvidia.com/v1"
-PROMPT_TEST = "Bonjour. Reponds uniquement par 'OK'."
-DELAY_BETWEEN_REQUESTS = 1.5  # secondes (rate-limit free tier)
-TIMEOUT = 25
+OUTPUT_PATH = PLUGIN_DIR / "config" / "models.validated.json"
 
-# ── Liste des modeles a tester (extraite du catalogue NVIDIA NIM free tier) ──
-
-MODELS = [
-    # NVIDIA proprietaires
-    ("nvidia/nemotron-3-ultra-550b-a55b", "Nemotron 3 Ultra 550B"),
-    ("nvidia/nemotron-3-super-120b-a12b", "Nemotron 3 Super 120B"),
-    ("nvidia/nemotron-3.5-content-safety", "Nemotron 3.5 Content Safety"),
-    ("nvidia/nemotron-3-content-safety", "Nemotron 3 Content Safety"),
-    ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni Reasoning"),
-    ("nvidia/nemotron-3-nano-30b-a3b", "Nemotron 3 Nano 30B"),
-    ("nvidia/nemotron-mini-4b-instruct", "Nemotron Mini 4B"),
-    ("nvidia/nemotron-nano-12b-v2-vl", "Nemotron Nano 12B v2 VL"),
-    ("nvidia/nemotron-voicechat", "Nemotron Voicechat"),
-    ("nvidia/nemotron-content-safety-reasoning-4b", "Nemotron Safety Reasoning 4B"),
-    ("nvidia/cosmos3-nano", "Cosmos3 Nano"),
-    ("nvidia/cosmos3-nano-reasoner", "Cosmos3 Nano Reasoner"),
-    ("nvidia/cosmos-transfer2.5-2b", "Cosmos Transfer 2.5 2B"),
-    ("nvidia/cosmos-transfer1-7b", "Cosmos Transfer1 7B"),
-    ("nvidia/cosmos-predict1-5b", "Cosmos Predict1 5B"),
-    ("nvidia/synthetic-video-detector", "Synthetic Video Detector"),
-    ("nvidia/Active Speaker Detection", "Active Speaker Detection"),
-    ("nvidia/ising-calibration-1-35b-a3b", "Ising Calibration 1 35B"),
-    ("nvidia/riva-translate-4b-instruct-v1.1", "Riva Translate 4B"),
-    ("nvidia/nv-embed-v1", "NV-Embed v1"),
-    ("nvidia/nv-embedcode-7b-v1", "NV-EmbedCode 7B"),
-    ("nvidia/gliner-pii", "GLiNER PII"),
-    ("nvidia/llama-3.1-nemotron-safety-guard-8b-v3", "Llama 3.1 Nemotron Safety 8B"),
-    ("nvidia/llama-3.3-nemotron-super-49b-v1.5", "Llama 3.3 Nemotron Super 49B v1.5"),
-    ("nvidia/llama-3.3-nemotron-super-49b-v1", "Llama 3.3 Nemotron Super 49B v1"),
-    ("nvidia/llama-3.1-nemotron-nano-vl-8b-v1", "Llama 3.1 Nemotron Nano VL 8B"),
-    ("nvidia/llama-3.1-nemotron-nano-8b-v1", "Llama 3.1 Nemotron Nano 8B"),
-    ("nvidia/nemotron-nano-9b-v2", "Nemotron Nano 9B v2"),
-    ("nvidia/nvidia-nemotron-nano-9b-v2", "NVIDIA Nemotron Nano 9B v2"),
-    ("nvidia/usdcode", "USDCode"),
-    ("nvidia/magpie-tts-zeroshot", "Magpie TTS Zeroshot"),
-    ("nvidia/Background Noise Removal", "Background Noise Removal"),
-    ("nvidia/sparsedrive", "SparseDrive"),
-    ("nvidia/bevformer", "BevFormer"),
-    ("nvidia/streampetr", "StreamPETR"),
-
-    # Meta
-    ("meta/llama-3.3-70b-instruct", "Llama 3.3 70B"),
-    ("meta/llama-3.1-70b-instruct", "Llama 3.1 70B"),
-    ("meta/llama-3.1-8b-instruct", "Llama 3.1 8B"),
-    ("meta/llama-3.2-90b-vision-instruct", "Llama 3.2 90B Vision"),
-    ("meta/llama-3.2-11b-vision-instruct", "Llama 3.2 11B Vision"),
-    ("meta/llama-3.2-3b-instruct", "Llama 3.2 3B"),
-    ("meta/llama-3.2-1b-instruct", "Llama 3.2 1B"),
-    ("meta/llama-4-maverick-17b-128e-instruct", "Llama 4 Maverick 17B"),
-    ("meta/llama-guard-4-12b", "Llama Guard 4 12B"),
-
-    # Mistral AI
-    ("mistralai/mistral-large-3-675b-instruct-2512", "Mistral Large 3 675B"),
-    ("mistralai/mistral-medium-3.5-128b", "Mistral Medium 3.5 128B"),
-    ("mistralai/mistral-small-4-119b-2603", "Mistral Small 4 119B"),
-    ("mistralai/ministral-14b-instruct-2512", "Ministral 14B"),
-    ("mistralai/mistral-nemotron", "Mistral Nemotron"),
-    ("mistralai/mixtral-8x7b-instruct-v0.1", "Mixtral 8x7B"),
-
-    # Qwen
-    ("qwen/qwen3.5-122b-a10b", "Qwen 3.5 122B"),
-    ("qwen/qwen3.5-397b-a17b", "Qwen 3.5 397B"),
-    ("qwen/qwen3-coder-480b-a35b-instruct", "Qwen 3 Coder 480B"),
-    ("qwen/qwen3-next-80b-a3b-instruct", "Qwen 3 Next 80B"),
-
-    # DeepSeek
-    ("deepseek-ai/deepseek-v4-flash", "DeepSeek V4 Flash"),
-
-    # Google
-    ("google/gemma-4-31b-it", "Gemma 4 31B"),
-    ("google/gemma-3n-e4b-it", "Gemma 3n e4b"),
-    ("google/gemma-3n-e2b-it", "Gemma 3n e2b"),
-    ("google/gemma-2-2b-it", "Gemma 2 2B"),
-    ("google/paligemma", "PaliGemma"),
-
-    # OpenAI
-    ("openai/gpt-oss-20b", "GPT-OSS 20B"),
-    ("openai/gpt-oss-120b", "GPT-OSS 120B"),
-
-    # Autres
-    ("stepfun-ai/step-3.7-flash", "Step 3.7 Flash"),
-    ("stepfun-ai/step-3.5-flash", "Step 3.5 Flash"),
-    ("moonshotai/kimi-k2.6", "Kimi K2.6"),
-    ("z-ai/glm-5.1", "GLM 5.1"),
-    ("minimaxai/minimax-m2.7", "MiniMax M2.7"),
-    ("microsoft/phi-4-mini-instruct", "Phi 4 Mini"),
-    ("microsoft/phi-4-multimodal-instruct", "Phi 4 Multimodal"),
-    ("bytedance/seed-oss-36b-instruct", "Seed OSS 36B"),
-    ("sarvamai/sarvam-m", "Sarvam M"),
-    ("dracarys-llama-3.1-70b-instruct", "Dracarys Llama 3.1 70B"),
-    ("upstage/solar-10.7b-instruct", "Solar 10.7B"),
-    ("stockmark/stockmark-2-100b-instruct", "Stockmark 2 100B"),
-]
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-class Colors:
-    OK = ""
-    KO = ""
-    WARN = ""
-    INFO = ""
-    RESET = ""
+# Candidats issus du benchmark A1 (catalogue gratuit juin 2026), groupes par role.
+# Prefixe LiteLLM 'nvidia_nim/<owner>/<model>'.
+CANDIDATES: dict[str, list[str]] = {
+    "router": [
+        "nvidia/nemotron-3-nano-30b-a3b",
+        "nvidia/nemotron-mini-4b-instruct",
+    ],
+    "general": [
+        "nvidia/nemotron-3-super-120b-a12b",
+        "meta/llama-3.3-70b-instruct",
+        "openai/gpt-oss-120b",
+    ],
+    "reasoning": [
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "deepseek-ai/deepseek-v4-flash",
+        "z-ai/glm-5.1",
+        "meta/llama-3.1-70b-instruct",
+    ],
+    "code": [
+        "qwen/qwen3-coder-480b-a35b-instruct",
+        "mistralai/mistral-small-4-119b-2603",
+    ],
+    "vision_fast": [
+        "nvidia/nemotron-nano-12b-v2-vl",
+        "meta/llama-3.2-11b-vision-instruct",
+    ],
+    "vision_deep": [
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        "qwen/qwen3.5-397b-a17b",
+        "meta/llama-3.2-90b-vision-instruct",
+    ],
+    "doc_intel": [
+        "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+        "microsoft/phi-4-multimodal-instruct",
+    ],
+    "extract_json": [
+        "mistralai/mistral-large-3-675b-instruct-2512",
+    ],
+    "safety": [
+        "nvidia/nemotron-3.5-content-safety",
+        "nvidia/llama-3.1-nemotron-safety-guard-8b-v3",
+    ],
+    "translate": [
+        "nvidia/riva-translate-4b-instruct-v1.1",
+    ],
+}
 
 
-def _safe_print(tag, msg):
-    import sys
-    line = f"{tag} {msg}\n"
-    sys.stdout.buffer.write(line.encode("utf-8", errors="replace"))
-    sys.stdout.buffer.flush()
+def flatten_candidates(candidates: dict[str, list[str]]) -> list[tuple[str, str]]:
+    """Aplatit le dict role->[models] en [(role, model)] sans doublon de modele."""
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for role, models in candidates.items():
+        for model in models:
+            if model not in seen:
+                seen.add(model)
+                out.append((role, model))
+    return out
 
 
-def log_ok(msg): _safe_print("[OK]", msg)
-def log_ko(msg): _safe_print("[KO]", msg)
-def log_info(msg): _safe_print("[INFO]", msg)
-def log_warn(msg): _safe_print("[WARN]", msg)
+def build_entry(role: str, model: str, ok: bool, latency_ms: float,
+                error: str | None, response: str = "") -> dict:
+    """Construit une entree de resultat normalisee."""
+    return {
+        "role": role,
+        "model": f"nvidia_nim/{model}",
+        "ok": ok,
+        "latency_ms": round(latency_ms, 1),
+        "error": error,
+        "response_preview": (response or "")[:60],
+    }
 
 
-def test_api_key(api_key):
-    """Test simple : liste les modeles disponibles via l'API NVIDIA."""
+def summarize(results: list[dict]) -> dict:
+    """Resume les resultats (compteurs + modeles OK par role)."""
+    ok = [r for r in results if r["ok"]]
+    by_role: dict[str, list[str]] = {}
+    for r in ok:
+        by_role.setdefault(r["role"], []).append(r["model"])
+    return {
+        "total": len(results),
+        "working": len(ok),
+        "failed": len(results) - len(ok),
+        "working_by_role": by_role,
+    }
+
+
+# Valeurs placeholder a ignorer (fichier .env.local non rempli)
+PLACEHOLDERS = {"", "colle_ta_cle_ici", "ta_cle_ici", "ta_nouvelle_cle", "nvapi-xxx"}
+
+
+def load_env_file(path: Path) -> dict:
+    """Parse un .env simple (KEY=VALUE). Ignore commentaires et lignes vides."""
+    env: dict[str, str] = {}
+    if not path.is_file():
+        return env
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        key, _, val = s.partition("=")
+        env[key.strip()] = val.strip().strip('"').strip("'")
+    return env
+
+
+def apply_env_files(root: Path) -> None:
+    """Charge .env.local puis .env (sans ecraser les variables deja definies)."""
+    for name in (".env.local", ".env"):
+        for key, val in load_env_file(root / name).items():
+            os.environ.setdefault(key, val)
+
+
+def resolve_api_key(argv: list[str]) -> str | None:
+    """Cle depuis argv (hors flags) sinon NVIDIA_API_KEY. Ignore les placeholders."""
+    for arg in argv[1:]:
+        if not arg.startswith("-") and arg not in PLACEHOLDERS:
+            return arg
+    key = os.environ.get("NVIDIA_API_KEY", "")
+    return key if key not in PLACEHOLDERS else None
+
+
+def _probe_model(model: str, api_key: str, timeout: int = 30) -> tuple[bool, float, str | None, str]:
+    """Appelle un modele via le gateway. Retourne (ok, latency_ms, error, preview)."""
+    from llm_gateway import chat  # import tardif : vendor doit etre pret
+    start = time.time()
     try:
-        import urllib.request
-        req = urllib.request.Request(
-            f"{API_BASE}/models",
-            headers={"Authorization": f"Bearer {api_key}"},
+        resp = chat(
+            model=f"nvidia_nim/{model}",
+            messages=[{"role": "user", "content": "Reponds uniquement: OK"}],
+            api_keys={"nvidia_nim": api_key},
+            stream=False,
+            max_tokens=8,
         )
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            data = json.loads(resp.read())
-            models = data.get("data", [])
-            return True, len(models)
-    except Exception as e:
-        return False, str(e)
+        latency = (time.time() - start) * 1000
+        content = resp["choices"][0]["message"]["content"] or ""
+        return True, latency, None, content
+    except Exception as exc:  # noqa: BLE001
+        latency = (time.time() - start) * 1000
+        return False, latency, str(exc)[:160], ""
 
 
-def test_model(model_id, api_key):
-    """Envoi un prompt minimal pour verifier que le modele repond."""
-    try:
-        import urllib.request
-        payload = json.dumps({
-            "model": model_id,
-            "messages": [{"role": "user", "content": PROMPT_TEST}],
-            "max_tokens": 5,
-            "temperature": 0.0,
-        }).encode("utf-8")
+def run(api_key: str) -> dict:
+    """Valide tous les candidats en live et ecrit models.validated.json."""
+    pairs = flatten_candidates(CANDIDATES)
+    results: list[dict] = []
+    print(f"Validation de {len(pairs)} modeles candidats via le gateway NVIDIA NIM...\n")
+    for role, model in pairs:
+        ok, latency, error, preview = _probe_model(model, api_key)
+        status = "OK " if ok else "KO "
+        print(f"  [{status}] {role:12s} {model:55s} {latency:7.0f}ms"
+              + (f"  -> {error}" if error else ""))
+        results.append(build_entry(role, model, ok, latency, error, preview))
 
-        req = urllib.request.Request(
-            f"{API_BASE}/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-
-        start = time.time()
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            data = json.loads(resp.read())
-            latency = round((time.time() - start) * 1000)
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            return True, latency, content[:50]
-    except Exception as e:
-        return False, 0, str(e)[:120]
+    summary = summarize(results)
+    payload = {
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "api_key_preview": f"{api_key[:8]}...{api_key[-4:]}",
+        "summary": summary,
+        "results": results,
+    }
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nResultat ecrit : {OUTPUT_PATH}")
+    print(f"OK {summary['working']}/{summary['total']}  |  KO {summary['failed']}")
+    return payload
 
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+def main(argv: list[str]) -> int:
+    if "--dry-run" in argv:
+        pairs = flatten_candidates(CANDIDATES)
+        print(f"DRY-RUN : {len(pairs)} modeles candidats (aucun appel reseau)\n")
+        for role, model in pairs:
+            print(f"  {role:12s} nvidia_nim/{model}")
+        return 0
 
-def main():
-    # 1. Recuperer la cle API
-    api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
+    apply_env_files(ROOT)
+    api_key = resolve_api_key(argv)
     if not api_key:
-        # Essayer de lire .env.local
-        env_path = Path(__file__).parent.parent / ".env.local"
-        if env_path.exists():
-            text = env_path.read_text(encoding="utf-8")
-            m = re.search(r'NVIDIA_API_KEY=(\S+)', text)
-            if m:
-                api_key = m.group(1).strip()
+        print("ERREUR: cle API NVIDIA requise.")
+        print("  Astuce: mets ta cle dans .env.local (NVIDIA_API_KEY=...) a la racine.")
+        print("  Usage: python scripts/validate_nvidia_models.py <NVIDIA_API_KEY>")
+        print("     ou: $env:NVIDIA_API_KEY='nvapi-...' ; python scripts/validate_nvidia_models.py")
+        return 1
 
-    if not api_key:
-        log_ko("Aucune cle API NVIDIA trouvee. Definissez NVIDIA_API_KEY.")
-        sys.exit(1)
-
-    log_info(f"Cle API : {api_key[:12]}...{api_key[-4:]}")
-
-    # 2. Valider la cle
-    log_info("Validation de la cle API...")
-    ok, info = test_api_key(api_key)
-    if ok:
-        log_ok(f"Cle API valide — {info} modeles accessibles")
-    else:
-        log_ko(f"Cle API invalide : {info}")
-        sys.exit(1)
-
-    # 3. Tester chaque modele
-    _safe_print("", f"\n{'='*70}")
-    _safe_print("", f"Test de {len(MODELS)} modeles (delai {DELAY_BETWEEN_REQUESTS}s entre chaque)")
-    _safe_print("", f"{'='*70}\n")
-
-    results = []
-    passed = 0
-    failed = 0
-
-    for idx, (model_id, label) in enumerate(MODELS, 1):
-        ok, latency, detail = test_model(model_id, api_key)
-        status = "OK" if ok else "KO"
-        results.append({
-            "model": model_id,
-            "label": label,
-            "status": status,
-            "latency_ms": latency if ok else None,
-            "detail": detail,
-        })
-
-        if ok:
-            log_ok(f"[{idx:3d}/{len(MODELS)}] {label:45s} ({latency:>5}ms) {detail[:30]}")
-            passed += 1
-        else:
-            # Filtrer les messages d'erreur trop verbeux
-            err_short = detail[:80]
-            log_ko(f"[{idx:3d}/{len(MODELS)}] {label:45s} — {err_short}")
-            failed += 1
-
-        if idx < len(MODELS):
-            time.sleep(DELAY_BETWEEN_REQUESTS)
-
-    # 4. Rapport
-    _safe_print("", f"\n{'='*70}")
-    _safe_print("", f"RESULTAT : {passed} OK / {failed} KO / {len(MODELS)} total")
-    _safe_print("", f"{'='*70}")
-
-    # Sauvegarde JSON
-    report_path = Path(__file__).parent / "nvidia_validation_report.json"
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump({
-            "api_key_valid": True,
-            "total": len(MODELS),
-            "passed": passed,
-            "failed": failed,
-            "models": results,
-        }, f, indent=2, ensure_ascii=False)
-    log_info(f"Rapport JSON : {report_path}")
-
-    # Resume des KO
-    if failed:
-        _safe_print("", "\nModeles en echec :")
-        for r in results:
-            if r["status"] == "KO":
-                _safe_print("", f"  - {r['label']} ({r['model']})")
-                _safe_print("", f"    {r['detail'][:100]}")
-
-    return 0 if failed == 0 else 1
+    run(api_key)
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))

@@ -18,9 +18,11 @@ TOOLS = [{
 }]
 
 
-def _build(model, tools):
+def _build(model, tools, api_keys=None):
+    if api_keys is None:
+        api_keys = {"nvidia_nim": "k", "ollama_base_url": "http://x"}
     return g._build_completion_kwargs(
-        model=model, messages=[], api_keys={"nvidia_nim": "k", "ollama_base_url": "http://x"},
+        model=model, messages=[], api_keys=api_keys,
         stream=False, temperature=None, max_tokens=None, tools=tools,
     )
 
@@ -42,6 +44,11 @@ def test_nvidia_without_tools_routes_via_openai_provider():
 
 
 def test_non_nvidia_with_tools_sets_tool_choice():
-    kw = _build("openrouter/anthropic/claude-3.5-sonnet", TOOLS)
+    # Sans cle nvidia_nim, le routage NVIDIA ne s'applique pas : le modele garde
+    # son nom et recoit quand meme tool_choice=auto.
+    kw = _build(
+        "openrouter/anthropic/claude-3.5-sonnet", TOOLS,
+        api_keys={"openrouter": "k", "ollama_base_url": "http://x"},
+    )
     assert kw["model"] == "openrouter/anthropic/claude-3.5-sonnet"
     assert kw["tool_choice"] == "auto"
