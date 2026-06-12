@@ -16,6 +16,9 @@ export function useServerHealth() {
   useEffect(() => {
     let mounted = true;
     let interval: NodeJS.Timeout | null = null;
+    let pollDelay = 30000; // Start with 30s (exponential backoff on failure)
+    const maxDelay = 120000; // Max 2 minutes
+    const minDelay = 30000; // Min 30 seconds
 
     const fetchServerInfo = async () => {
       try {
@@ -33,11 +36,15 @@ export function useServerHealth() {
           setIsConnected(true);
           setError(null);
           setLastFetch(Date.now());
+          // Reset backoff on success
+          pollDelay = minDelay;
         }
       } catch (err) {
         if (mounted) {
           setIsConnected(false);
           setError(err instanceof Error ? err.message : "Connection failed");
+          // Exponential backoff: double delay up to maxDelay
+          pollDelay = Math.min(pollDelay * 2, maxDelay);
         }
       }
     };
@@ -45,12 +52,20 @@ export function useServerHealth() {
     // Fetch immediately
     fetchServerInfo();
 
-    // Poll every 30 seconds
-    interval = setInterval(fetchServerInfo, 30000);
+    // Schedule next poll with adaptive delay
+    const scheduleNextPoll = () => {
+      if (mounted) {
+        interval = setTimeout(() => {
+          fetchServerInfo();
+          scheduleNextPoll(); // Reschedule with updated delay
+        }, pollDelay);
+      }
+    };
+    scheduleNextPoll();
 
     return () => {
       mounted = false;
-      if (interval) clearInterval(interval);
+      if (interval) clearTimeout(interval);
     };
   }, []);
 
