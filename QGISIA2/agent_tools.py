@@ -11,12 +11,23 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, List, Optional
 
 import uuid
 
-# Sessions d'agent en pause (ask_user) : {session_id -> state}
+# Sessions d'agent en pause (ask_user) : {session_id -> {state + timestamp}}
 _AGENT_SESSIONS: dict[str, dict] = {}
+_SESSION_TTL_SECONDS = 300  # 5 minutes
+
+
+def _cleanup_stale_sessions() -> None:
+    """Supprime les sessions expirées (> 5 min)."""
+    now = time.time()
+    expired = [sid for sid, state in _AGENT_SESSIONS.items()
+               if now - state.get("_created_at", 0) > _SESSION_TTL_SECONDS]
+    for sid in expired:
+        _AGENT_SESSIONS.pop(sid, None)
 
 try:
     from mcp_server import (
@@ -283,6 +294,7 @@ def run_tool_loop(
                                 "on_event": on_event,
                                 "pending_tool_call_id": call["id"],
                                 "pending_tool_name": call["name"],
+                                "_created_at": time.time(),  # TTL tracking
                             }
                             _emit({"type": "ask_user", "session_id": session_id,
                                    "question": parsed["question"], "options": parsed["options"]})
@@ -323,6 +335,7 @@ def resume_tool_loop(session_id: str, selected_option: str) -> dict:
     Returns:
         {content, trace, iterations} ou {error} si session inconnue.
     """
+    _cleanup_stale_sessions()  # Nettoyer les sessions expirées (TTL 5 min)
     state = _AGENT_SESSIONS.pop(session_id, None)
     if state is None:
         return {"error": f"Session inconnue ou expiree: {session_id}"}
