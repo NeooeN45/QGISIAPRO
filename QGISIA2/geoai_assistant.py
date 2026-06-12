@@ -4136,11 +4136,18 @@ class ThreadedAssetServer:
                 api_keys = body.get("api_keys", {}) or {}
                 context = body.get("context") or {}
                 auto_route = bool(body.get("auto_route", True))
+                stream = bool(body.get("stream", False))
 
                 try:
                     from agent_federation import AgentFederation
                 except ImportError:
                     from .agent_federation import AgentFederation
+
+                if stream:
+                    self._stream_smart_response(
+                        handler, query, api_keys, context=context, auto_route=auto_route,
+                    )
+                    return True
 
                 logs = []
                 federation = AgentFederation(api_keys)
@@ -4187,6 +4194,7 @@ class ThreadedAssetServer:
                 max_iters = min(int(body.get("max_iters", 30)), 100)
                 auto_mode = bool(body.get("auto_mode", False))
                 system = body.get("system")
+                stream = bool(body.get("stream", False))
                 # Le bridge QGIS est servi par ce meme serveur (multi-thread) : on
                 # route les appels d'outils vers notre propre hote.
                 host = handler.headers.get("Host", "127.0.0.1")
@@ -4196,6 +4204,14 @@ class ThreadedAssetServer:
                     from agent_tools import run_tool_loop
                 except ImportError:
                     from .agent_tools import run_tool_loop
+
+                if stream:
+                    self._stream_agent_response(
+                        handler, messages, api_keys,
+                        model=model, max_iters=max_iters, auto_mode=auto_mode,
+                        system=system, bridge_url=bridge_url,
+                    )
+                    return True
 
                 result = run_tool_loop(
                     messages, api_keys,
@@ -4510,6 +4526,107 @@ class ThreadedAssetServer:
                 "traceback": traceback.format_exc(),
             })
             return True
+
+    def _sse_start(self, handler) -> None:
+        """Envoie les headers SSE communs (text/event-stream, no-cache, CORS)."""
+        handler.send_response(200)
+        handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        handler.send_header("Cache-Control", "no-cache")
+        _send_cors_headers(handler)
+        handler.send_header("X-Accel-Buffering", "no")
+        handler.end_headers()
+
+    def _sse_emit(self, handler, payload: dict) -> None:
+        """Sérialise et envoie un événement SSE, flush immédiat."""
+        line = json.dumps(payload, ensure_ascii=False)
+        handler.wfile.write(f"data: {line}\n\n".encode("utf-8"))
+        handler.wfile.flush()
+
+    def _stream_agent_response(
+        self, handler, messages, api_keys, *,
+        model, max_iters, auto_mode, system, bridge_url,
+    ):
+        """Stream SSE de la boucle agentique (iteration/tool_start/tool_result/final)."""
+        try:
+            from agent_tools import run_tool_loop
+        except ImportError:
+            from .agent_tools import run_tool_loop
+
+        self._sse_start(handler)
+        try:
+            def on_event(ev: dict) -> None:
+                self._sse_emit(handler, ev)
+
+            result = run_tool_loop(
+                messages, api_keys,
+                model=model, max_iters=max_iters, auto_mode=auto_mode,
+                system=system, bridge_url=bridge_url,
+                on_event=on_event,
+            )
+            self._sse_emit(handler, {
+                "type": "final",
+                "content": result.get("content", ""),
+                "iterations": result.get("iterations", 0),
+                "trace_len": len(result.get("trace", [])),
+            })
+        except Exception as exc:  # noqa: BLE001
+            try:
+                self._sse_emit(handler, {"type": "error", "error": str(exc)})
+            except Exception:  # noqa: BLE001
+                pass
+        finally:
+            try:
+                handler.wfile.write(b"data: [DONE]\n\n")
+                handler.wfile.flush()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _stream_smart_response(
+        self, handler, query: str, api_keys: dict, *, context: dict, auto_route: bool,
+    ):
+        """Stream SSE de la federation multi-agents (progress/final)."""
+        try:
+            from agent_federation import AgentFederation
+        except ImportError:
+            from .agent_federation import AgentFederation
+
+        self._sse_start(handler)
+        try:
+            def progress_cb(message: str) -> None:
+                self._sse_emit(handler, {"type": "progress", "message": message})
+
+            result = AgentFederation(api_keys).process(
+                query,
+                auto_route=auto_route,
+                context=context,
+                progress_callback=progress_cb,
+            )
+            serialized = {
+                k: v for k, v in result.items() if k != "agent_results"
+            }
+            serialized["agent_results"] = [
+                {
+                    "agent_type": r.agent_type.value,
+                    "success": r.success,
+                    "content": r.content,
+                    "latency_ms": r.latency_ms,
+                    "model_used": r.model_used,
+                    "error": r.error,
+                }
+                for r in result.get("agent_results", [])
+            ]
+            self._sse_emit(handler, {"type": "final", "result": serialized})
+        except Exception as exc:  # noqa: BLE001
+            try:
+                self._sse_emit(handler, {"type": "error", "error": str(exc)})
+            except Exception:  # noqa: BLE001
+                pass
+        finally:
+            try:
+                handler.wfile.write(b"data: [DONE]\n\n")
+                handler.wfile.flush()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _stream_llm_response(self, handler, model, messages, api_keys,
                               temperature, max_tokens, tools):

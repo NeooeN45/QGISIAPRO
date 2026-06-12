@@ -167,6 +167,7 @@ def run_tool_loop(
     chat_fn: Any = None,
     http_client: Any = None,
     native_get_json: Any = None,
+    on_event: Optional[Any] = None,  # Callable[[dict], None] — optionnel, retro-compatible
 ) -> dict:
     """
     Boucle agentique de tool calling :
@@ -188,7 +189,16 @@ def run_tool_loop(
         msgs.insert(0, {"role": "system", "content": system or DEFAULT_AGENT_SYSTEM})
     trace: List[dict] = []
 
+    def _emit(event: dict) -> None:
+        """Emet un evenement SSE si le callback est fourni (sans exception)."""
+        if on_event is not None:
+            try:
+                on_event(event)
+            except Exception:  # noqa: BLE001
+                pass
+
     for iteration in range(1, max_iters + 1):
+        _emit({"type": "iteration", "i": iteration})
         response = chat_fn(
             model=model,
             messages=msgs,
@@ -213,6 +223,7 @@ def run_tool_loop(
             "tool_calls": message.get("tool_calls"),
         })
         for call in calls:
+            _emit({"type": "tool_start", "tool": call["name"], "arguments": call["arguments"]})
             allowed, reason = safety_check(call["name"], call["arguments"], auto_mode)
             if not allowed:
                 result = f"BLOQUE PAR SECURITE: {reason}"
@@ -222,6 +233,7 @@ def run_tool_loop(
                     "result": result,
                     "blocked": True,
                 })
+                _emit({"type": "tool_result", "tool": call["name"], "result": result[:300], "blocked": True})
             else:
                 try:
                     if call["name"] in native_tool_names():
@@ -241,6 +253,7 @@ def run_tool_loop(
                     "arguments": call["arguments"],
                     "result": result[:500],
                 })
+                _emit({"type": "tool_result", "tool": call["name"], "result": result[:300], "blocked": False})
             msgs.append({
                 "role": "tool",
                 "tool_call_id": call["id"],
