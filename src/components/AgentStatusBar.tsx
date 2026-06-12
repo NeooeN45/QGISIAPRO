@@ -2,7 +2,7 @@
  * Barre d'etat agent : mode, alias, budget, requetes, statut gateway.
  * Fine, fixee en bas du chat. Poll getBudget toutes les 60s.
  */
-import React, { memo, useCallback, useEffect, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useGatewayStore } from "../stores/useGatewayStore";
 import { useLLMGateway } from "../hooks/useLLMGateway";
 import type { BudgetSnapshot } from "../lib/litellm-client";
@@ -24,7 +24,7 @@ function AgentStatusBar({ budgetFetcher }: AgentStatusBarProps) {
 
   const [budget, setBudget] = useState<BudgetWithWarn | null>(null);
 
-  const fetcher = budgetFetcher || getBudget;
+  const fetcher = useMemo(() => budgetFetcher ?? getBudget, [budgetFetcher, getBudget]);
 
   const fetchBudget = useCallback(async () => {
     if (!ready) return;

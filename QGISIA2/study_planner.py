@@ -131,7 +131,9 @@ class _PlanBuilder:
             raise ValueError(f"ID duplique: {step_id}")
         self._id_set.add(step_id)
 
-        merged_params = {**(params or {}), **self.context}
+        # Le contexte utilisateur (bbox, datetime...) sert de base ; les params
+        # explicites de l'etape (index, method...) gardent la priorite.
+        merged_params = {**self.context, **(params or {})}
         step = {
             "id": step_id,
             "action": action,
