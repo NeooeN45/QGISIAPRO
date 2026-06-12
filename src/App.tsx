@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
 
 import Chat from "./components/Chat";
+import AgentStatusBar from "./components/AgentStatusBar";
 import TaskStatusPanel from "./components/TaskStatusPanel";
 import { InstallationWizard } from "./components/InstallationWizard";
 import OllamaSetupWizard from "./components/OllamaSetupWizard";
@@ -1189,7 +1190,7 @@ Détail : ${message}`;
           {isAppReady && (
             <motion.div
               key="chat-shell"
-              className="flex h-full w-full"
+              className="flex h-full w-full flex-col"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
@@ -1220,6 +1221,7 @@ Détail : ${message}`;
                 selectedLayerIds={activeConversation?.selectedLayerIds || []}
                 settings={settings}
               />
+              <AgentStatusBar />
             </motion.div>
           )}
         </AnimatePresence>
