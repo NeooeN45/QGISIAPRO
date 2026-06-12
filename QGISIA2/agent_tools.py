@@ -173,6 +173,7 @@ def run_tool_loop(
     http_client: Any = None,
     native_get_json: Any = None,
     on_event: Optional[Any] = None,  # Callable[[dict], None] — optionnel, retro-compatible
+    _start_iteration: int = 1,  # Privé: pour resume_tool_loop après ask_user
 ) -> dict:
     """
     Boucle agentique de tool calling :
@@ -202,7 +203,7 @@ def run_tool_loop(
             except Exception:  # noqa: BLE001
                 pass
 
-    for iteration in range(1, max_iters + 1):
+    for iteration in range(_start_iteration, _start_iteration + max_iters):
         _emit({"type": "iteration", "i": iteration})
         response = chat_fn(
             model=model,
@@ -352,11 +353,17 @@ def resume_tool_loop(session_id: str, selected_option: str) -> dict:
     _emit({"type": "tool_result", "tool": state["pending_tool_name"],
            "result": f"Utilisateur a choisi: {selected_option}", "blocked": False})
 
+    # Calculer les itérations restantes (pas recommencer de zéro)
+    current_iteration = state.get("iteration", 0)
+    original_max = state["max_iters"]
+    remaining_iters = max(1, original_max - current_iteration)
+    next_start_iter = current_iteration + 1
+
     return run_tool_loop(
         msgs,
         state["api_keys"],
         model=state["model"],
-        max_iters=state["max_iters"],
+        max_iters=remaining_iters,  # Itérations restantes, pas le total
         auto_mode=state["auto_mode"],
         system=state["system"],
         bridge_url=state["bridge_url"],
@@ -364,4 +371,5 @@ def resume_tool_loop(session_id: str, selected_option: str) -> dict:
         http_client=state["http_client"],
         native_get_json=state.get("native_get_json"),
         on_event=state.get("on_event"),
+        _start_iteration=next_start_iter,  # Reprendre à l'itération suivante
     )

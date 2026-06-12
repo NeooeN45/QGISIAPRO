@@ -2,7 +2,7 @@
  * Modal QCM pour l'outil ask_user (pause/reprise agent).
  * Affiche une question avec des options radio + bouton valider.
  */
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 export interface QuestionModalProps {
   question: string;
@@ -29,6 +29,17 @@ export default function QuestionModal({
       onSelect(selected);
     }
   }, [selected, onSelect]);
+
+  // Escape key closes modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && onCancel) {
+        onCancel();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
 
   return (
     <div
