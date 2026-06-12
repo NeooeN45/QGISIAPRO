@@ -26,3 +26,4 @@ __pycache__/
 *.qgz
 RAPPORT_ETAT_REEL.md
 UI_IMPROVEMENTS.md
+.claude/worktrees/
