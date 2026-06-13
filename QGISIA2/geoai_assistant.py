@@ -4746,7 +4746,25 @@ class ThreadedAssetServer:
             allow_reuse_address = True
             timeout = None  # Set per-request
 
-        self.httpd = QuietThreadingServer(("127.0.0.1", 0), AssetRequestHandler)
+        # Port DÉTERMINISTE : l'origine (127.0.0.1:PORT) doit rester stable entre
+        # deux lancements, sinon le localStorage du navigateur (clés API chiffrées,
+        # réglages) est cloisonné par port et reparti de zéro à chaque session.
+        # On essaie une liste fixe (surchageable via QGISIA_PORT), repli aléatoire.
+        candidate_ports = []
+        env_port = os.environ.get("QGISIA_PORT")
+        if env_port and env_port.isdigit():
+            candidate_ports.append(int(env_port))
+        candidate_ports += [8157, 8158, 8159, 8160, 8161]
+        candidate_ports.append(0)  # dernier recours : port libre aléatoire
+
+        self.httpd = None
+        for candidate in candidate_ports:
+            try:
+                self.httpd = QuietThreadingServer(("127.0.0.1", candidate), AssetRequestHandler)
+                break
+            except OSError:
+                continue  # port occupé → essayer le suivant
+
         self.httpd.timeout = self.request_timeout
         self.port = self.httpd.server_address[1]
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
