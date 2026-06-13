@@ -370,3 +370,47 @@ Gate : pytest OK, <320 lignes, no qgis/PyQt imports
 14. Connecteur foncier : DVF/cadastre/data.gouv (+ spec Pappers) pour propriétaires et parcelles.
 15-17. Pack Incendie : dNBR pipeline, severity classes, restoration planner (Q3 2026)
 18-20. Pack Urbanisme : parcel analysis, zoning rules, urban report (Q4 2026)
+
+---
+
+## PROMPT 12 — Streaming des réponses agent (live) — PRIORITAIRE
+
+```
+CONTEXTE (vérifié) :
+Plugin QGIS GeoSylva AI. Le chat par défaut passe par l'agent autonome :
+frontend src/lib/llm.ts:generateViaAgent -> src/lib/litellm-client.ts:runAgentStream
+-> POST /api/llm/agent {stream:true} -> QGISIA2/geoai_assistant.py:_stream_agent_response
+-> QGISIA2/agent_tools.py:run_tool_loop(on_event=...).
+Le backend émet déjà des events SSE via _sse_emit (iteration/tool_start/tool_result/final)
+avec flush. PROBLÈME RÉEL CONSTATÉ EN QGIS : aucun affichage live — l'utilisateur ne voit
+qu'un spinner puis TOUT arrive d'un coup à la fin. Deux causes :
+1) Le texte FINAL de l'agent n'est jamais streamé token par token (run_tool_loop renvoie
+   le content complet à la fin ; aucun event "delta").
+2) La livraison SSE incrémentale est peu fiable dans le navigateur lancé par QGIS
+   (QWebEngine / keep-alive) : les events arrivent groupés.
+
+TÂCHE :
+A) BACKEND — streamer le texte final token par token.
+   - Dans run_tool_loop (agent_tools.py) : à l'itération SANS tool_calls (réponse finale),
+     au lieu d'un chat() bloquant, faire un appel STREAMING (llm_gateway a déjà
+     _stream_with_tracking) et émettre via on_event des events {"type":"delta","text":chunk}
+     au fil des tokens, puis {"type":"final",...}. Rétro-compatible : si on_event est None,
+     comportement bloquant inchangé.
+   - _stream_agent_response (geoai_assistant.py) relaie ces "delta" en SSE (déjà générique).
+B) FRONTEND — afficher les deltas en direct.
+   - litellm-client.ts:runAgentStream : gérer ev.type==="delta" -> nouveau callback onDelta(text).
+   - llm.ts:generateViaAgent : passer onDelta -> streamingStore.addChunk(text) pour voir le
+     texte se construire ; garder handleAgentEvent pour les outils (🔧).
+C) ROBUSTESSE LIVRAISON — fallback polling si le SSE ne s'affiche pas live.
+   - Optionnel mais recommandé : endpoint GET /api/llm/agent/progress?session_id=... qui
+     renvoie les events accumulés ; le frontend poll toutes les 800ms si le 1er event SSE
+     n'arrive pas en < 3s. (run_tool_loop stocke les events dans un dict module {session_id:[events]}.)
+
+CONTRAINTES : ne pas casser ask_user (pause/reprise) ni le mode non-stream. Garder le
+plafond max_iters. FR pour les libellés UI.
+
+TESTS : pytest (run_tool_loop émet bien des "delta" quand on_event fourni + un final ;
+non-stream inchangé) ; vitest (runAgentStream route delta->onDelta) ; npm run build + tsc.
+
+LIVRAISON : branche kimi/agent-streaming. Gate : pytest vert, vitest vert, build vert.
+```
