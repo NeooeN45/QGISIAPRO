@@ -244,13 +244,29 @@ TOOL_CATALOG: list[McpToolSpec] = [
     ),
     McpToolSpec(
         name="zoomToLayer",
-        description="Zoomer le canvas sur l'emprise d'une couche.",
+        description="Zoomer le canvas sur l'emprise d'une couche. NE PAS utiliser sur un fond de carte mondial (OSM) : cela affiche le monde entier. Pour cadrer sur un lieu, utilise setMapExtent avec la bbox du géocodage.",
         input_schema={
             "type": "object",
             "properties": {"layerId": {"type": "string"}},
             "required": ["layerId"],
         },
         endpoint="/api/qgis/zoomToLayer",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="setMapExtent",
+        description="Cadrer la vue sur une emprise géographique WGS84. INDISPENSABLE après un géocodage pour centrer la carte sur un lieu (ville, commune). Passe la bbox renvoyée par geocode.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "bbox": {
+                    "type": "string",
+                    "description": "Emprise 'minlon,minlat,maxlon,maxlat' ou point 'lon,lat' (WGS84). Utilise la valeur 'bbox' renvoyée par l'outil geocode.",
+                },
+            },
+            "required": ["bbox"],
+        },
+        endpoint="/api/qgis/setMapExtent",
         payload_builder=_direct_payload,
     ),
     McpToolSpec(

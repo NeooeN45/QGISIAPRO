@@ -49,16 +49,28 @@ def _geocode(args: dict, get_json: Callable) -> dict:
     if country:
         params["countrycodes"] = country
     data = get_json(NOMINATIM_URL, params)
-    results = [
-        {
+    results = []
+    for d in (data or [])[:limit]:
+        if "lat" not in d or "lon" not in d:
+            continue
+        entry = {
             "name": d.get("display_name"),
             "lat": float(d["lat"]),
             "lon": float(d["lon"]),
             "type": d.get("type"),
         }
-        for d in (data or [])[:limit]
-        if "lat" in d and "lon" in d
-    ]
+        # bbox prête pour setMapExtent : 'minlon,minlat,maxlon,maxlat' (WGS84).
+        # Nominatim renvoie boundingbox = [minlat, maxlat, minlon, maxlon].
+        bb = d.get("boundingbox")
+        if isinstance(bb, (list, tuple)) and len(bb) == 4:
+            try:
+                minlat, maxlat, minlon, maxlon = (float(x) for x in bb)
+                entry["bbox"] = f"{minlon},{minlat},{maxlon},{maxlat}"
+            except (TypeError, ValueError):
+                entry["bbox"] = f"{entry['lon']},{entry['lat']}"
+        else:
+            entry["bbox"] = f"{entry['lon']},{entry['lat']}"
+        results.append(entry)
     return {"query": query, "count": len(results), "results": results}
 
 

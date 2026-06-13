@@ -117,6 +117,7 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.core import (
     QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
     QgsDataSourceUri,
     QgsFeature,
     QgsField,
@@ -129,6 +130,7 @@ from qgis.core import (
     QgsProcessingFeedback,
     QgsProject,
     QgsRasterLayer,
+    QgsRectangle,
     QgsSingleSymbolRenderer,
     QgsTextBufferSettings,
     QgsTextFormat,
@@ -938,6 +940,46 @@ class QgisBridge(BridgeQObject):
         self.iface.setActiveLayer(layer)
         self.iface.zoomToActiveLayer()
         message = f"Vue centrée sur {layer.name()}."
+        self._notify(message, Qgis.Info)
+        return message
+
+    @BridgeSlot(str, result=str)
+    def setMapExtent(self, bbox):
+        """Cadre la vue sur une emprise/point WGS84.
+
+        bbox : 'minlon,minlat,maxlon,maxlat' (emprise) ou 'lon,lat' (point ->
+        petite emprise auto). Indispensable pour cadrer sur un lieu géocodé,
+        car zoomToLayer sur un fond mondial (OSM) affiche le monde entier.
+        """
+        try:
+            parts = [float(x) for x in str(bbox).replace(";", ",").split(",") if x.strip()]
+        except ValueError:
+            return "bbox invalide (nombres attendus)"
+
+        if len(parts) == 2:
+            lon, lat = parts
+            margin = 0.05
+            rect = QgsRectangle(lon - margin, lat - margin, lon + margin, lat + margin)
+        elif len(parts) == 4:
+            xmin, ymin, xmax, ymax = parts
+            rect = QgsRectangle(xmin, ymin, xmax, ymax)
+        else:
+            return "bbox invalide (attendu 'minlon,minlat,maxlon,maxlat' ou 'lon,lat')"
+
+        canvas = self.iface.mapCanvas()
+        try:
+            dst = canvas.mapSettings().destinationCrs()
+            src = QgsCoordinateReferenceSystem("EPSG:4326")
+            if dst.isValid() and src != dst:
+                transform = QgsCoordinateTransform(src, dst, QgsProject.instance())
+                rect = transform.transformBoundingBox(rect)
+            rect.scale(1.1)  # légère marge
+            canvas.setExtent(rect)
+            canvas.refresh()
+        except Exception as exc:  # noqa: BLE001
+            return f"Erreur cadrage: {exc}"
+
+        message = "Vue cadrée sur l'emprise demandée."
         self._notify(message, Qgis.Info)
         return message
 
@@ -3572,6 +3614,11 @@ class ThreadedAssetServer:
                     "zoomToLayer",
                     body.get("layerId", ""),
                 )
+            elif route == "/api/qgis/setMapExtent":
+                result = self._bridge_call(
+                    "setMapExtent",
+                    body.get("bbox", ""),
+                )
             elif route == "/api/qgis/reprojectLayer":
                 result = self._bridge_call(
                     "reprojectLayer",
@@ -4625,10 +4672,16 @@ class ThreadedAssetServer:
             return True
 
     def _sse_start(self, handler) -> None:
-        """Envoie les headers SSE communs (text/event-stream, no-cache, CORS)."""
+        """Envoie les headers SSE communs (text/event-stream, no-cache, CORS).
+
+        `Connection: close` est essentiel : sans lui, le keep-alive HTTP fait que
+        le navigateur bufferise toute la reponse et n'affiche les evenements (outils,
+        progression) qu'a la fin. Avec close, chaque flush arrive immediatement.
+        """
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
         handler.send_header("Cache-Control", "no-cache")
+        handler.send_header("Connection", "close")
         _send_cors_headers(handler)
         handler.send_header("X-Accel-Buffering", "no")
         handler.end_headers()
