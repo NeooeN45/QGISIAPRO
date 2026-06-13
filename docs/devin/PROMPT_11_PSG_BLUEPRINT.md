@@ -21,7 +21,7 @@ Plugin QGIS "GeoSylva AI" — architecture stable :
 3. forest_classes (NDVI+NDMI → 6 classes IGN)
 4. path_classifier (OSM + MNT → praticabilité)
 
-**Spec complète** : `docs/VISION_METIERS.md` (section 1.1 PSG Blueprint)
+**Spec complète** : `../product/VISION_METIERS.md` (section 1.1 PSG Blueprint)
 
 ---
 

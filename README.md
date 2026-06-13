@@ -126,7 +126,7 @@ UI React (Chat)
           bridge QGIS (/api/qgis/*) ─► PyQGIS réel
 ```
 
-Détails complets : [`docs/AGENTIC_BACKEND.md`](docs/AGENTIC_BACKEND.md).
+Détails complets : [`docs/architecture/AGENTIC_BACKEND.md`](docs/architecture/AGENTIC_BACKEND.md). Index de la doc : [`docs/README.md`](docs/README.md).
 
 ---
 

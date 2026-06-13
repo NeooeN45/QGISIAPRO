@@ -128,7 +128,7 @@ LIVRAISON : branche kimi/agent-status-bar, npm run test + npm run build verts.
 7. Panneau Mise en page + bouton « Auto-améliorer » branché sur /api/llm/autoImproveLayout.
 8. `voice_intents` v2 : couverture de toutes les actions du TOOL_CATALOG.
 
-### Pack Gestion Forestière (voir VISION_METIERS.md — qualité > rapidité)
+### Pack Gestion Forestière (voir ../product/VISION_METIERS.md — qualité > rapidité)
 
 9. Outil `ask_user` (QCM agent) : spec pure du protocole pause/reprise de run_tool_loop + composant frontend de choix multiple. **La capacité transverse la plus importante.**
 
@@ -253,7 +253,7 @@ Gate : npm run test + npm run build vert, pas de ts errors
 
 ```
 CONTEXTE PROJET (stable) :
-Plugin QGIS "GeoSylva AI" avec ask_user + agent federation. Vision métiers en VISION_METIERS.md
+Plugin QGIS "GeoSylva AI" avec ask_user + agent federation. Vision métiers en ../product/VISION_METIERS.md
 (voir section Pack 1 : Gestion Forestière pour spécification complète).
 
 TÂCHE (module pur Python) :
