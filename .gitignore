@@ -4,6 +4,7 @@ dist/
 coverage/
 qgis_plugin/web/
 QGISIA2/vendor/
+QGISIA2/QGISIA2/
 *.zip
 releases/
 QGISIA2/data/
