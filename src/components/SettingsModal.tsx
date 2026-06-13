@@ -29,6 +29,7 @@ import {
 import { motion } from "motion/react";
 import OllamaSetupWizard from "./OllamaSetupWizard";
 import { GatewaySettingsPanel } from "./GatewaySettingsPanel";
+import { refreshCredentialsStatus, saveCredential } from "../lib/litellm-client";
 import { toast } from "sonner";
 
 import { cn } from "@/src/lib/utils";
@@ -111,6 +112,7 @@ function SecretInput({
   onChange,
   onPaste,
   onToggle,
+  onBlur,
 }: {
   value: string;
   placeholder: string;
@@ -118,6 +120,7 @@ function SecretInput({
   onChange: (value: string) => void;
   onPaste: () => void;
   onToggle: () => void;
+  onBlur?: () => void;
 }) {
   return (
     <div className="flex gap-2">
@@ -126,6 +129,7 @@ function SecretInput({
           type={visible ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 pr-12 text-sm text-white outline-none transition-all placeholder:text-white/25 focus:border-blue-500/35"
         />
@@ -251,6 +255,7 @@ export default function SettingsModal({
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
   const [showNvidiaKey, setShowNvidiaKey] = useState(false);
+  const [nvidiaKeyOnServer, setNvidiaKeyOnServer] = useState(false);
   const [activeTab, setActiveTab] = useState<"provider" | "gateway" | "config" | "execution" | "diagnostics">("provider");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const defaults = new Set<string>(["provider"]);
@@ -268,6 +273,17 @@ export default function SettingsModal({
     defaults.add("pyqgis-auto");
     return defaults;
   });
+  // Présence de la clé NVIDIA côté plugin (QgsSettings) — persiste hors navigateur.
+  useEffect(() => {
+    let active = true;
+    void refreshCredentialsStatus().then((configured) => {
+      if (active) setNvidiaKeyOnServer(Boolean(configured.nvidia_nim));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // openRouterModels remplacé par OPENROUTER_ROLE_PRESETS statiques (plus fiable)
   const [openRouterKeyInfo, setOpenRouterKeyInfo] = useState<OpenRouterKeyInfo | null>(null);
   const [isLoadingOpenRouterKeyInfo, setIsLoadingOpenRouterKeyInfo] = useState(false);
@@ -944,7 +960,9 @@ export default function SettingsModal({
           placeholder={
             nvidiaKeySource === "env"
               ? maskSecret(envNvidiaApiKey)
-              : "nvapi-... (clé NVIDIA NIM)"
+              : nvidiaKeyOnServer
+                ? "•••• clé enregistrée côté plugin (laisser vide pour la garder)"
+                : "nvapi-... (clé NVIDIA NIM)"
           }
           visible={showNvidiaKey}
           onChange={(value) =>
@@ -953,9 +971,21 @@ export default function SettingsModal({
               nvidiaApiKey: value,
             }))
           }
+          onBlur={() => {
+            const value = normalizedLocalSettings.nvidiaApiKey.trim();
+            if (value) {
+              void saveCredential("nvidia_nim", value).then(() => setNvidiaKeyOnServer(true));
+            }
+          }}
           onPaste={() => void onPasteApiKey("nvidia" as any)}
           onToggle={() => setShowNvidiaKey((current) => !current)}
         />
+        {nvidiaKeyOnServer && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-400/80">
+            <CheckCircle2 size={12} />
+            Clé enregistrée côté plugin — conservée entre les sessions, même si ce champ est vide.
+          </p>
+        )}
       </div>
       <div className="mt-4">
         <label className="mb-2 block text-xs font-medium text-white/70">

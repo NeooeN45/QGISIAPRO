@@ -53,6 +53,42 @@ except ImportError:
     MENU_CONFIG = {}
     TOOLBAR_CONFIG = {}
 
+
+# ── Persistance des clés API côté plugin (QgsSettings) ────────────────────────
+# Stockage indépendant du navigateur, du port et du localStorage : la clé saisie
+# une fois reste disponible entre sessions. Le backend la réinjecte dans chaque
+# requête LLM si le frontend n'en fournit pas (fallback : QgsSettings puis env).
+_API_KEY_PROVIDERS = ("nvidia_nim", "openrouter", "gemini")
+_ENV_KEY_FALLBACK = {"nvidia_nim": "NVIDIA_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+
+
+def _stored_api_keys():
+    """Clés persistées (QgsSettings) + repli variables d'environnement."""
+    keys = {}
+    try:
+        from qgis.core import QgsSettings
+        settings = QgsSettings()
+        for provider in _API_KEY_PROVIDERS:
+            value = settings.value(f"QGISIA/keys/{provider}", "", type=str)
+            if value:
+                keys[provider] = value
+    except Exception:  # pragma: no cover - hors QGIS
+        pass
+    for provider, env_name in _ENV_KEY_FALLBACK.items():
+        if not keys.get(provider) and os.environ.get(env_name):
+            keys[provider] = os.environ[env_name]
+    return keys
+
+
+def _store_api_key(provider, key):
+    """Persiste (ou efface) une clé API dans QgsSettings."""
+    try:
+        from qgis.core import QgsSettings
+        QgsSettings().setValue(f"QGISIA/keys/{provider}", key or "")
+        return True
+    except Exception:  # pragma: no cover - hors QGIS
+        return False
+
 # Import des modules d'installation Ollama
 try:
     from .system_capabilities import system_capabilities
@@ -3867,11 +3903,42 @@ class ThreadedAssetServer:
         route = parsed.path
         body = self._read_json_body(handler) if request_method == "POST" else {}
 
+        # Clés API : persistance transparente + réinjection. La 1ère clé fournie
+        # par le frontend est mémorisée (QgsSettings) ; ensuite chaque requête est
+        # complétée depuis le stockage/env si le frontend n'en envoie pas.
+        if isinstance(body, dict) and route != "/api/llm/credentials":
+            body_keys = body.get("api_keys") or {}
+            if isinstance(body_keys, dict):
+                for provider, value in body_keys.items():
+                    if value and provider in _API_KEY_PROVIDERS:
+                        _store_api_key(provider, value)
+                merged = dict(_stored_api_keys())
+                merged.update({k: v for k, v in body_keys.items() if v})
+                if merged:
+                    body["api_keys"] = merged
+
         try:
             try:
                 from . import llm_gateway, llm_installer
             except ImportError as exc:
                 self._send_json(handler, 500, {"ok": False, "error": f"llm_gateway indisponible: {exc}"})
+                return True
+
+            if route == "/api/llm/credentials":
+                # GET : présence des clés (jamais le secret). POST : enregistre une clé.
+                if request_method == "GET":
+                    stored = _stored_api_keys()
+                    self._send_json(handler, 200, {
+                        "ok": True,
+                        "configured": {p: bool(stored.get(p)) for p in _API_KEY_PROVIDERS},
+                    })
+                    return True
+                provider = body.get("provider", "")
+                if provider not in _API_KEY_PROVIDERS:
+                    self._send_json(handler, 400, {"ok": False, "error": "provider invalide"})
+                    return True
+                _store_api_key(provider, body.get("key", ""))
+                self._send_json(handler, 200, {"ok": True})
                 return True
 
             if route == "/api/llm/health":

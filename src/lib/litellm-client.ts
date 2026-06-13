@@ -159,6 +159,39 @@ async function apiFetch<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Credentials persistées côté plugin (QgsSettings) — indépendantes du navigateur
+// ---------------------------------------------------------------------------
+
+let _serverConfiguredKeys: Record<string, boolean> = {};
+
+/** Rafraîchit (et met en cache) la présence des clés côté plugin. */
+export async function refreshCredentialsStatus(): Promise<Record<string, boolean>> {
+  try {
+    const data = await apiFetch<{ ok: boolean; configured: Record<string, boolean> }>(
+      "/api/llm/credentials",
+    );
+    _serverConfiguredKeys = data.configured ?? {};
+  } catch {
+    // backend indisponible : on garde le cache courant
+  }
+  return _serverConfiguredKeys;
+}
+
+/** Vrai si une clé pour ce provider est déjà enregistrée côté plugin. */
+export function isProviderConfiguredServerSide(provider: string): boolean {
+  return Boolean(_serverConfiguredKeys[provider]);
+}
+
+/** Enregistre explicitement une clé côté plugin (persiste entre sessions). */
+export async function saveCredential(provider: string, key: string): Promise<void> {
+  await apiFetch("/api/llm/credentials", {
+    method: "POST",
+    body: JSON.stringify({ provider, key }),
+  });
+  _serverConfiguredKeys[provider] = Boolean(key);
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 

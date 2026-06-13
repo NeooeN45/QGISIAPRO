@@ -18,6 +18,7 @@ import {
   installGatewaySync as gwInstallGatewaySync,
   smartProcess as gwSmartProcess,
   runAgent as gwRunAgent,
+  refreshCredentialsStatus as gwRefreshCredentials,
   type ChatRequest,
   type ChatResponse,
   type ChatChunk,
@@ -95,11 +96,12 @@ export function useLLMGateway(): UseLLMGatewayResult {
     }
   }, []);
 
-  // Ping initial (une seule fois)
+  // Ping initial (une seule fois) + statut des clés persistées côté plugin
   useEffect(() => {
     if (checkedOnce.current) return;
     checkedOnce.current = true;
     void refreshHealth();
+    void gwRefreshCredentials();
   }, [refreshHealth]);
 
   const chat = useCallback<UseLLMGatewayResult["chat"]>(

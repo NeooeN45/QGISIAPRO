@@ -25,6 +25,7 @@ import {
   runAgent as gatewayRunAgent,
   runAgentStream,
   smartProcessStream,
+  isProviderConfiguredServerSide,
   type ChatMessage,
   type AgentStreamEvent,
   type ApiKeys,
@@ -961,16 +962,19 @@ async function generateViaNvidia(
   const streamingStore = useStreamingStore.getState();
 
   const apiKey = settings.nvidiaApiKey.trim() || getConfiguredNvidiaApiKey();
-  if (!apiKey) {
+  // La clé peut aussi être stockée côté plugin (QgsSettings) : dans ce cas le
+  // backend l'injecte lui-même, on ne bloque donc pas si le localStorage est vide.
+  if (!apiKey && !isProviderConfiguredServerSide("nvidia_nim")) {
     throw new Error("Aucune cle API NVIDIA NIM n'est configuree.");
   }
+  const keyOverride = apiKey ? { nvidia_nim: apiKey } : undefined;
 
   // Mode Auto (défaut) : on délègue à la fédération multi-agents. L'intent-router
   // backend analyse la demande et choisit le meilleur modèle par tâche
   // (généraliste / raisonnement / vision / code PyQGIS), avec fallbacks.
   const chosenModel = (settings.nvidiaModel || "").trim();
   if (!chosenModel || chosenModel === NVIDIA_AUTO_MODEL) {
-    return generateViaFederation(input, { nvidia_nim: apiKey });
+    return generateViaFederation(input, keyOverride);
   }
 
   // Override explicite : l'utilisateur a forcé un modèle précis dans les Paramètres.
@@ -990,8 +994,9 @@ async function generateViaNvidia(
     const full = await gatewayStreamToText(
       {
         model: chosenModel,
+        // Si clé locale absente, le backend injecte celle stockée côté plugin.
+        api_keys: (keyOverride ?? {}) as ApiKeys,
         messages,
-        api_keys: { nvidia_nim: apiKey },
         signal: input.signal,
       },
       (delta) => streamingStore.addChunk(delta),
