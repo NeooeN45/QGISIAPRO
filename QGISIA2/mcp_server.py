@@ -270,6 +270,34 @@ TOOL_CATALOG: list[McpToolSpec] = [
         payload_builder=_direct_payload,
     ),
     McpToolSpec(
+        name="renameLayer",
+        description="Renommer une couche avec un nom clair et descriptif (ex: 'Fond OpenStreetMap', 'NDVI 2024'). Ne nomme PAS une couche d'après le lieu seul.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "name": {"type": "string", "description": "Nouveau nom descriptif"},
+            },
+            "required": ["layerId", "name"],
+        },
+        endpoint="/api/qgis/renameLayer",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
+        name="setLayerGroup",
+        description="Ranger une couche dans un groupe nommé du panneau (créé si absent). Organise l'arbre des couches de façon pro : ex. groupes 'Fonds de carte', 'Données', 'Analyses', 'Résultats'.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "layerId": {"type": "string"},
+                "groupName": {"type": "string", "description": "Nom du groupe (ex: 'Fonds de carte')"},
+            },
+            "required": ["layerId", "groupName"],
+        },
+        endpoint="/api/qgis/setLayerGroup",
+        payload_builder=_direct_payload,
+    ),
+    McpToolSpec(
         name="filterLayer",
         description="Appliquer un filtre attributaire (subset string SQL) sur une couche vectorielle.",
         input_schema={

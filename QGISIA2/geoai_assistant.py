@@ -984,6 +984,54 @@ class QgisBridge(BridgeQObject):
         return message
 
     @BridgeSlot(str, str, result=str)
+    def renameLayer(self, layer_ref, new_name):
+        """Renomme une couche (nom affiché dans le panneau)."""
+        layer = self._find_layer(layer_ref)
+        if layer is None:
+            return "Couche introuvable."
+        new_name = (new_name or "").strip()
+        if not new_name:
+            return "Nom vide."
+        old = layer.name()
+        layer.setName(new_name)
+        message = f"Couche '{old}' renommee en '{new_name}'."
+        self._notify(message, Qgis.Info)
+        return message
+
+    @BridgeSlot(str, str, result=str)
+    def setLayerGroup(self, layer_ref, group_name):
+        """Range une couche dans un groupe nommé du panneau (cree le groupe si besoin).
+
+        Permet une organisation pro de l'arbre des couches : fonds de carte,
+        donnees, analyses, etc. dans des groupes clairs.
+        """
+        layer = self._find_layer(layer_ref)
+        if layer is None:
+            return "Couche introuvable."
+        group_name = (group_name or "").strip() or "Groupe"
+        try:
+            root = QgsProject.instance().layerTreeRoot()
+            group = root.findGroup(group_name)
+            if group is None:
+                group = root.addGroup(group_name)
+            node = root.findLayer(layer.id())
+            if node is None:
+                return "Noeud de couche introuvable."
+            # Déjà dans le bon groupe ?
+            if node.parent() is group:
+                return f"Couche deja dans '{group_name}'."
+            cloned = node.clone()
+            group.insertChildNode(0, cloned)
+            parent = node.parent()
+            if parent is not None:
+                parent.removeChildNode(node)
+        except Exception as exc:  # noqa: BLE001
+            return f"Erreur groupe: {exc}"
+        message = f"Couche '{layer.name()}' rangee dans le groupe '{group_name}'."
+        self._notify(message, Qgis.Info)
+        return message
+
+    @BridgeSlot(str, str, result=str)
     def getLayerStatistics(self, layer_ref, field_name):
         layer = self._find_layer(layer_ref)
         if not isinstance(layer, QgsVectorLayer):
@@ -3618,6 +3666,18 @@ class ThreadedAssetServer:
                 result = self._bridge_call(
                     "setMapExtent",
                     body.get("bbox", ""),
+                )
+            elif route == "/api/qgis/renameLayer":
+                result = self._bridge_call(
+                    "renameLayer",
+                    body.get("layerId", ""),
+                    body.get("name", ""),
+                )
+            elif route == "/api/qgis/setLayerGroup":
+                result = self._bridge_call(
+                    "setLayerGroup",
+                    body.get("layerId", ""),
+                    body.get("groupName", ""),
                 )
             elif route == "/api/qgis/reprojectLayer":
                 result = self._bridge_call(
