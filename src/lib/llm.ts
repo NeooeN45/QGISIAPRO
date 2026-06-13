@@ -761,15 +761,21 @@ async function generateViaFederation(
     }
   };
 
-  const buildFull = (result: { routing?: string | null; agent_results?: Array<{ model_used?: string; content?: string }>; error?: string; synthesis?: string | null }): string => {
+  const buildFull = (result: { routing?: string | null; agent_results?: Array<{ model_used?: string; content?: string; success?: boolean; error?: string }>; error?: string; synthesis?: string | null }): string => {
     const agent = result.agent_results?.[0];
     const header = result.routing
       ? `🧭 Agent : **${result.routing}**`
         + (agent?.model_used ? ` · modèle \`${agent.model_used}\`` : "")
         + "\n\n"
       : "";
+    // Surface l'erreur réelle (agent puis résultat) au lieu d'un message générique
+    // muet — sinon l'utilisateur ne sait pas pourquoi rien ne s'affiche.
+    const agentError = agent && agent.success === false ? agent.error : undefined;
     const content =
-      agent?.content || result.error || "La fédération n'a pas produit de réponse.";
+      (agent?.content && agent.content.trim())
+      || (agentError ? `⚠️ Échec de l'agent : ${agentError}` : "")
+      || (result.error ? `⚠️ ${result.error}` : "")
+      || "⚠️ Aucune réponse du modèle. Vérifiez la clé API NVIDIA (Paramètres) et le quota.";
     const synthesis = result.synthesis
       ? `\n\n---\n**Synthèse :** ${result.synthesis}`
       : "";
