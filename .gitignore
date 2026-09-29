@@ -28,3 +28,6 @@ __pycache__/
 RAPPORT_ETAT_REEL.md
 UI_IMPROVEMENTS.md
 .claude/worktrees/
+
+# Rapports security_diag (hooks Quintessences)
+output/

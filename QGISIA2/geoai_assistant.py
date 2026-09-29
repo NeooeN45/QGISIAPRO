@@ -5431,10 +5431,13 @@ class GeoAIAssistant:
                     3
                 )
                 try:
+                    import shutil
+                    npm_cmd = shutil.which("npm.cmd") or shutil.which("npm")
+                    if not npm_cmd:
+                        raise FileNotFoundError("npm introuvable dans le PATH")
                     subprocess.Popen(
-                        "npm run dev",
+                        [npm_cmd, "run", "dev"],
                         cwd=project_path,
-                        shell=True,
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
                     from qgis.PyQt.QtWidgets import QApplication
